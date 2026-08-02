@@ -7,6 +7,8 @@ export interface IUser extends Document {
   passwordHash: string
   role: 'admin' | 'pm' | 'site_engineer'
   status: 'active' | 'inactive'
+  resetPasswordToken?: string   // hashed token stored in DB
+  resetPasswordExpires?: Date   // expiry timestamp
 }
 
 const userSchema = new Schema<IUser>(
@@ -41,6 +43,14 @@ const userSchema = new Schema<IUser>(
       type: String,
       enum: ['active', 'inactive'],
       default: 'active',
+    },
+    resetPasswordToken: {
+      type: String,
+      default: undefined,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      default: undefined,
     },
   },
   {
