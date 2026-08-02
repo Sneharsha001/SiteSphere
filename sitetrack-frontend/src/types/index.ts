@@ -1,24 +1,26 @@
 // ── Auth ──────────────────────────────────────────────────────────────────
 
+export type UserRole = 'admin' | 'pm' | 'site_engineer'
+
+export interface AuthUser {
+  _id: string
+  name: string
+  email: string
+  role: UserRole
+  status: 'active' | 'inactive'
+  orgId: string
+}
+
 export interface LoginCredentials {
   email: string
   password: string
 }
 
-export interface AuthResponse {
-  access_token: string
-  token_type: string
-  user: User
-}
-
-// ── User ──────────────────────────────────────────────────────────────────
-
-export interface User {
-  id: number
-  email: string
-  full_name: string
-  role: 'admin' | 'manager' | 'engineer' | 'viewer'
-  created_at: string
+/** Shape returned by POST /api/auth/login */
+export interface LoginResponse {
+  success: boolean
+  token: string
+  user: AuthUser
 }
 
 // ── Project ───────────────────────────────────────────────────────────────
@@ -26,35 +28,27 @@ export interface User {
 export type ProjectStatus = 'planning' | 'active' | 'on_hold' | 'completed'
 
 export interface Project {
-  id: number
+  _id: string
   name: string
   description: string
   status: ProjectStatus
   progress: number
-  start_date: string
-  end_date: string | null
-  manager: User
-  created_at: string
-  updated_at: string
-}
-
-export interface CreateProjectPayload {
-  name: string
-  description: string
-  start_date: string
-  end_date?: string
+  startDate: string
+  endDate?: string
+  orgId: string
+  createdAt: string
+  updatedAt: string
 }
 
 // ── API Response wrappers ─────────────────────────────────────────────────
 
-export interface PaginatedResponse<T> {
-  items: T[]
-  total: number
-  page: number
-  size: number
-  pages: number
+export interface ApiSuccess<T> {
+  success: true
+  data: T
 }
 
 export interface ApiError {
-  detail: string | { msg: string; type: string }[]
+  success: false
+  message: string
+  status: number
 }
