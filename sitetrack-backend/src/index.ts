@@ -11,7 +11,7 @@ async function bootstrap(): Promise<void> {
 
   const server = app.listen(PORT, () => {
     console.log(`🚀  SiteTrack API running on http://localhost:${PORT}`)
-    console.log(`📋  Health check: http://localhost:${PORT}/api/health`)
+    console.log(`📋  Health check: http://localhost:${PORT}/health`)
     console.log(`🌍  Environment: ${process.env.NODE_ENV ?? 'development'}`)
   })
 
