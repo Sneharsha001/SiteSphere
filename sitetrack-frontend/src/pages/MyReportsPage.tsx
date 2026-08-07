@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
-import type { Project, UserRole } from '../types'
+import type { Project } from '../types'
+import Header from '../components/Header'
 
 interface ReportPhoto {
   _id: string
@@ -30,15 +31,8 @@ interface Report {
   photos: ReportPhoto[]
 }
 
-const roleBadge: Record<string, { label: string; cls: string }> = {
-  admin: { label: 'Admin', cls: 'bg-violet-500/20 text-violet-300 border-violet-500/30' },
-  pm: { label: 'Project Manager', cls: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
-  site_engineer: { label: 'Site Engineer', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
-}
-
 export default function MyReportsPage() {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
+  useAuth()
 
   // Data states
   const [reports, setReports] = useState<Report[]>([])
@@ -130,13 +124,6 @@ export default function MyReportsPage() {
     return true
   })
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login', { replace: true })
-  }
-
-  const badge = user ? (roleBadge[user.role as UserRole] ?? roleBadge.site_engineer) : null
-
   // Format date helper
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -149,67 +136,8 @@ export default function MyReportsPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white">
-      {/* Top Navigation */}
-      <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                />
-              </svg>
-            </div>
-            <span className="font-bold text-lg tracking-tight">SiteTrack</span>
-          </div>
+      <Header />
 
-          <nav className="flex items-center gap-6 text-sm text-slate-400">
-            <Link to="/dashboard" className="hover:text-white transition-colors">
-              Dashboard
-            </Link>
-            <Link to="/projects" className="hover:text-white transition-colors">
-              Projects
-            </Link>
-            <Link to="/reports" className="text-white font-medium">
-              My Reports
-            </Link>
-            <Link to="/reports/new" className="hover:text-white transition-colors">
-              Submit DPR
-            </Link>
-
-            {user && (
-              <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-                <div className="text-right hidden sm:block">
-                  <p className="text-white text-sm font-medium leading-none">{user.name}</p>
-                  <p className="text-slate-500 text-xs mt-0.5">{user.email}</p>
-                </div>
-                {badge && (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${badge.cls}`}>
-                    {badge.label}
-                  </span>
-                )}
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-1.5 text-slate-400 hover:text-red-400 transition-colors text-sm font-medium"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                    />
-                  </svg>
-                  Sign out
-                </button>
-              </div>
-            )}
-          </nav>
-        </div>
-      </header>
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-6 py-10">

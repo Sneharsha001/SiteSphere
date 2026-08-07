@@ -5,14 +5,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
-import type { Project, UserRole } from '../types'
-
-// ── Role Badges ─────────────────────────────────────────────────────────────
-const roleBadge: Record<string, { label: string; cls: string }> = {
-  admin: { label: 'Admin', cls: 'bg-violet-500/20 text-violet-300 border-violet-500/30' },
-  pm: { label: 'Project Manager', cls: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
-  site_engineer: { label: 'Site Engineer', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
-}
+import type { Project } from '../types'
+import Header from '../components/Header'
+import { addPendingReport } from '../lib/db'
 
 // ── Get Today's Date String YYYY-MM-DD ─────────────────────────────────────
 const getTodayStr = () => {
@@ -45,7 +40,7 @@ const dprSchema = z.object({
 type DprFormData = z.infer<typeof dprSchema>
 
 export default function SubmitReportPage() {
-  const { user, logout } = useAuth()
+  useAuth()
   const navigate = useNavigate()
 
   const [projects, setProjects] = useState<Project[]>([])
@@ -59,6 +54,7 @@ export default function SubmitReportPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [offlineMessage, setOfflineMessage] = useState<string | null>(null)
 
   const todayStr = getTodayStr()
 
@@ -142,6 +138,69 @@ export default function SubmitReportPage() {
   const onSubmit = async (data: DprFormData) => {
     setSubmitError(null)
     setIsSubmitting(true)
+    setOfflineMessage(null)
+
+    // Helper to convert File to base64
+    const fileToBase64 = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = (err) => reject(err)
+        reader.readAsDataURL(file)
+      })
+    }
+
+    const saveOffline = async () => {
+      try {
+        const project = projects.find((p) => p._id === data.projectId)
+        const base64Photos = await Promise.all(
+          photos.map(async (file) => {
+            const base64 = await fileToBase64(file)
+            return {
+              name: file.name,
+              type: file.type,
+              base64,
+            }
+          })
+        )
+
+        await addPendingReport({
+          projectId: data.projectId,
+          projectName: project?.name || 'Unknown Project',
+          date: data.date,
+          workDone: data.workDone,
+          quantity: data.quantity,
+          labourSkilled: Number(data.labourSkilled ?? 0),
+          labourUnskilled: Number(data.labourUnskilled ?? 0),
+          labourOperators: Number(data.labourOperators ?? 0),
+          tomorrowPlan: data.tomorrowPlan,
+          issues: data.issues,
+          remarks: data.remarks,
+          photos: base64Photos,
+          createdAt: Date.now(),
+        })
+
+        setOfflineMessage("Saved locally — will upload automatically once you're back online")
+        setSubmitSuccess(true)
+
+        // Clean up object URLs
+        photoPreviews.forEach((url) => URL.revokeObjectURL(url))
+
+        setTimeout(() => {
+          navigate('/reports')
+        }, 1500)
+      } catch (dbErr: any) {
+        setSubmitError(`Failed to save report locally: ${dbErr.message || dbErr}`)
+      } finally {
+        setIsSubmitting(false)
+      }
+    }
+
+    // Check if browser is offline
+    if (!navigator.onLine) {
+      await saveOffline()
+      return
+    }
 
     try {
       const formData = new FormData()
@@ -176,91 +235,29 @@ export default function SubmitReportPage() {
         navigate('/reports')
       }, 1200)
     } catch (err: any) {
-      const serverMsg = err.response?.data?.message || err.message || ''
-      if (
-        serverMsg.toLowerCase().includes('already exists') ||
-        serverMsg.toLowerCase().includes('duplicate') ||
-        err.response?.status === 400
-      ) {
-        setSubmitError("You've already submitted a report for this project today — edit the existing one instead.")
+      const isNetworkErr = !err.response || err.code === 'ERR_NETWORK' || err.message === 'Network Error'
+      if (isNetworkErr) {
+        // API call failed due to a network error, save offline
+        await saveOffline()
       } else {
-        setSubmitError(serverMsg || 'Failed to submit Daily Progress Report. Please try again.')
+        const serverMsg = err.response?.data?.message || err.message || ''
+        if (
+          serverMsg.toLowerCase().includes('already exists') ||
+          serverMsg.toLowerCase().includes('duplicate') ||
+          err.response?.status === 400
+        ) {
+          setSubmitError("You've already submitted a report for this project today — edit the existing one instead.")
+        } else {
+          setSubmitError(serverMsg || 'Failed to submit Daily Progress Report. Please try again.')
+        }
+        setIsSubmitting(false)
       }
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login', { replace: true })
-  }
-
-  const badge = user ? (roleBadge[user.role as UserRole] ?? roleBadge.site_engineer) : null
-
   return (
     <div className="min-h-screen bg-slate-900 text-white">
-      {/* Top Navigation */}
-      <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                />
-              </svg>
-            </div>
-            <span className="font-bold text-lg tracking-tight">SiteTrack</span>
-          </div>
-
-          <nav className="flex items-center gap-6 text-sm text-slate-400">
-            <Link to="/dashboard" className="hover:text-white transition-colors">
-              Dashboard
-            </Link>
-            <Link to="/projects" className="hover:text-white transition-colors">
-              Projects
-            </Link>
-            <Link to="/reports" className="hover:text-white transition-colors">
-              My Reports
-            </Link>
-            <Link to="/reports/new" className="text-white font-medium">
-              Submit DPR
-            </Link>
-
-            {user && (
-              <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-                <div className="text-right hidden sm:block">
-                  <p className="text-white text-sm font-medium leading-none">{user.name}</p>
-                  <p className="text-slate-500 text-xs mt-0.5">{user.email}</p>
-                </div>
-                {badge && (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${badge.cls}`}>
-                    {badge.label}
-                  </span>
-                )}
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-1.5 text-slate-400 hover:text-red-400 transition-colors text-sm font-medium"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                    />
-                  </svg>
-                  Sign out
-                </button>
-              </div>
-            )}
-          </nav>
-        </div>
-      </header>
+      <Header />
 
       {/* Main Form Container */}
       <main className="max-w-4xl mx-auto px-6 py-10">
@@ -288,11 +285,14 @@ export default function SubmitReportPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
             <div>
-              <p className="font-semibold text-sm">Daily Progress Report Submitted Successfully!</p>
+              <p className="font-semibold text-sm">
+                {offlineMessage ? offlineMessage : 'Daily Progress Report Submitted Successfully!'}
+              </p>
               <p className="text-xs text-emerald-400/80 mt-0.5">Redirecting to My Reports list...</p>
             </div>
           </div>
         )}
+
 
         {/* Global Submit Error Banner */}
         {submitError && (
