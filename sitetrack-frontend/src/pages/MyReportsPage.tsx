@@ -4,6 +4,7 @@ import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import type { Project } from '../types'
 import Header from '../components/Header'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 
 interface ReportPhoto {
   _id: string
@@ -33,12 +34,14 @@ interface Report {
 
 export default function MyReportsPage() {
   useAuth()
+  const isOnline = useOnlineStatus()
 
   // Data states
   const [reports, setReports] = useState<Report[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isOfflineError, setIsOfflineError] = useState(false)
 
   // Filter states
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
@@ -55,10 +58,18 @@ export default function MyReportsPage() {
 
   // ── Fetch Reports & Projects ──────────────────────────────────────────────
   const fetchData = async () => {
+    // Don't attempt fetch if offline — avoids confusing network error
+    if (!navigator.onLine) {
+      setIsOfflineError(true)
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
-      
+      setIsOfflineError(false)
+
       // Fetch projects to populate project filter dropdown
       const projRes = await api.get('/projects')
       if (projRes.data && projRes.data.data) {
@@ -71,15 +82,28 @@ export default function MyReportsPage() {
         setReports(repRes.data.data)
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Failed to load progress reports.')
+      // Distinguish network failure from a real server error
+      const isNetworkErr = !err.response || err.code === 'ERR_NETWORK' || err.message === 'Network Error'
+      if (isNetworkErr) {
+        setIsOfflineError(true)
+      } else {
+        setError(err.response?.data?.message || err.message || 'Failed to load progress reports.')
+      }
     } finally {
       setLoading(false)
     }
   }
 
+  // Re-fetch when connectivity is restored
   useEffect(() => {
     fetchData()
   }, [])
+
+  useEffect(() => {
+    if (isOnline && isOfflineError) {
+      fetchData()
+    }
+  }, [isOnline])
 
   // ── Fetch single report detail ───────────────────────────────────────────
   const handleOpenDetail = async (reportId: string) => {
@@ -160,7 +184,23 @@ export default function MyReportsPage() {
           </Link>
         </div>
 
-        {/* Global Error message */}
+        {/* Offline banner — shown when device has no connectivity */}
+        {isOfflineError && (
+          <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
+            <svg className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M18.364 5.636a9 9 0 010 12.728M15.536 8.464a5 5 0 010 7.072M6.343 6.343a9 9 0 000 12.728M9.172 9.172a5 5 0 000 7.072M12 12h.01" />
+            </svg>
+            <div>
+              <p className="text-amber-300 text-sm font-semibold">You're offline</p>
+              <p className="text-amber-400/70 text-xs mt-0.5">
+                Report list can't be loaded without a connection. Any reports you submit now will be saved locally and synced automatically when you reconnect.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Global server error message */}
         {error && (
           <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
             {error}

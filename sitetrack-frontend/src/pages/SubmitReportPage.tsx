@@ -81,6 +81,12 @@ export default function SubmitReportPage() {
   // ── Fetch assigned projects ──────────────────────────────────────────────
   useEffect(() => {
     async function fetchProjects() {
+      // If offline, skip fetch — user can still save the report locally
+      if (!navigator.onLine) {
+        setProjectError('You are offline — project list unavailable, but you can still save a report locally.')
+        setLoadingProjects(false)
+        return
+      }
       try {
         setLoadingProjects(true)
         const res = await api.get('/projects')
@@ -88,7 +94,12 @@ export default function SubmitReportPage() {
           setProjects(res.data.data)
         }
       } catch (err: any) {
-        setProjectError('Failed to load assigned projects. Please try refreshing.')
+        const isNetworkErr = !err.response || err.code === 'ERR_NETWORK' || err.message === 'Network Error'
+        if (isNetworkErr) {
+          setProjectError('You are offline — project list unavailable, but you can still save a report locally.')
+        } else {
+          setProjectError('Failed to load assigned projects. Please try refreshing.')
+        }
       } finally {
         setLoadingProjects(false)
       }
@@ -336,7 +347,11 @@ export default function SubmitReportPage() {
                     ))}
                   </select>
                 )}
-                {projectError && <p className="text-red-400 text-xs mt-1">{projectError}</p>}
+                {projectError && (
+                  <p className={`text-xs mt-1 ${projectError.includes('offline') ? 'text-amber-400' : 'text-red-400'}`}>
+                    {projectError}
+                  </p>
+                )}
                 {errors.projectId && (
                   <p id="project-error" className="text-red-400 text-xs mt-1">{errors.projectId.message}</p>
                 )}
