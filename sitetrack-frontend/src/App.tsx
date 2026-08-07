@@ -4,6 +4,8 @@ import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import ProjectsPage from './pages/ProjectsPage'
+import SubmitReportPage from './pages/SubmitReportPage'
+import MyReportsPage from './pages/MyReportsPage'
 
 export default function App() {
   return (
@@ -32,7 +34,24 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute roles={['site_engineer', 'admin']}>
+              <MyReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/new"
+          element={
+            <ProtectedRoute roles={['site_engineer', 'admin']}>
+              <SubmitReportPage />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </AuthProvider>
   )
 }
+

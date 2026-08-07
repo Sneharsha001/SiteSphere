@@ -54,6 +54,12 @@ export default function DashboardPage() {
           <nav className="flex items-center gap-6 text-sm text-slate-400">
             <Link to="/dashboard" className="text-white font-medium">Dashboard</Link>
             <Link to="/projects" className="hover:text-white transition-colors">Projects</Link>
+            {(user?.role === 'site_engineer' || user?.role === 'admin') && (
+              <>
+                <Link to="/reports" className="hover:text-white transition-colors">My Reports</Link>
+                <Link to="/reports/new" className="hover:text-white transition-colors">Submit DPR</Link>
+              </>
+            )}
 
             {/* User info + logout */}
             {user && (

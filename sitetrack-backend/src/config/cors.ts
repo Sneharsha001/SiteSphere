@@ -13,7 +13,7 @@ export const corsOptions: CorsOptions = {
       return callback(null, true)
     }
 
-    if (origin === allowedOrigin) {
+    if (origin === allowedOrigin || /^https?:\/\/localhost(:\d+)?$/.test(origin)) {
       callback(null, true)
     } else {
       callback(new Error(`CORS: origin '${origin}' is not allowed`))

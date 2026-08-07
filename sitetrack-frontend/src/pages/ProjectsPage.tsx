@@ -33,7 +33,8 @@ export default function ProjectsPage() {
           <nav className="flex items-center gap-6 text-sm text-slate-400">
             <Link to="/dashboard" className="hover:text-white transition-colors">Dashboard</Link>
             <Link to="/projects" className="text-white font-medium">Projects</Link>
-            <Link to="/login" className="hover:text-white transition-colors">Logout</Link>
+            <Link to="/reports" className="hover:text-white transition-colors">My Reports</Link>
+            <Link to="/reports/new" className="hover:text-white transition-colors">Submit DPR</Link>
           </nav>
         </div>
       </header>
