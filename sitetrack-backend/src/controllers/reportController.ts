@@ -3,9 +3,9 @@ import mongoose from 'mongoose'
 import { DailyProgressReport } from '../models/DailyProgressReport'
 import { ReportPhoto } from '../models/ReportPhoto'
 import { ProjectAssignment } from '../models/ProjectAssignment'
-import { Project } from '../models/Project'
 import { AppError } from '../middleware/errorHandler'
 import { uploadBufferToCloudinary } from '../config/cloudinary'
+import { getAccessibleProjectIds } from '../utils/projectAccess'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -25,18 +25,7 @@ function getStartAndEndOfDay(dateInput: string | Date): { startOfDay: Date; endO
   return { startOfDay, endOfDay }
 }
 
-/** Get array of project IDs accessible to the current user */
-async function getAccessibleProjectIds(req: Request): Promise<mongoose.Types.ObjectId[]> {
-  const { role, userId, orgId } = req.user!
-
-  if (role === 'admin') {
-    const projects = await Project.find({ orgId }).select('_id').lean()
-    return projects.map((p) => p._id as mongoose.Types.ObjectId)
-  }
-
-  const assignments = await ProjectAssignment.find({ userId }).select('projectId').lean()
-  return assignments.map((a) => a.projectId as mongoose.Types.ObjectId)
-}
+// getAccessibleProjectIds is imported from '../utils/projectAccess'
 
 // ── POST /api/reports ─────────────────────────────────────────────────────
 
