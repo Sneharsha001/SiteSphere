@@ -65,21 +65,11 @@ export default function Header() {
           </Link>
         </div>
 
-        {/* Navigation & Controls */}
+        {/* Navigation & Controls — links are role-specific */}
         <nav className="flex items-center gap-6 text-sm text-slate-400">
-          <Link
-            to="/dashboard"
-            className={`transition-colors hover:text-white ${currentPath === '/dashboard' ? 'text-white font-medium' : ''}`}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/projects"
-            className={`transition-colors hover:text-white ${currentPath === '/projects' ? 'text-white font-medium' : ''}`}
-          >
-            Projects
-          </Link>
-          {(user?.role === 'site_engineer' || user?.role === 'admin') && (
+
+          {/* ── Site Engineer: My Reports + Submit DPR ── */}
+          {user?.role === 'site_engineer' && (
             <>
               <Link
                 to="/reports"
@@ -92,6 +82,60 @@ export default function Header() {
                 className={`transition-colors hover:text-white ${currentPath === '/reports/new' ? 'text-white font-medium' : ''}`}
               >
                 Submit DPR
+              </Link>
+            </>
+          )}
+
+          {/* ── PM: Dashboard + Projects + Reports (view-only) ── */}
+          {user?.role === 'pm' && (
+            <>
+              <Link
+                to="/dashboard"
+                className={`transition-colors hover:text-white ${currentPath === '/dashboard' ? 'text-white font-medium' : ''}`}
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/projects"
+                className={`transition-colors hover:text-white ${currentPath === '/projects' ? 'text-white font-medium' : ''}`}
+              >
+                Projects
+              </Link>
+              <Link
+                to="/reports"
+                className={`transition-colors hover:text-white ${currentPath === '/reports' ? 'text-white font-medium' : ''}`}
+              >
+                Reports
+              </Link>
+            </>
+          )}
+
+          {/* ── Admin: Dashboard + Projects + Users + Reports (view-only) ── */}
+          {user?.role === 'admin' && (
+            <>
+              <Link
+                to="/dashboard"
+                className={`transition-colors hover:text-white ${currentPath === '/dashboard' ? 'text-white font-medium' : ''}`}
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/projects"
+                className={`transition-colors hover:text-white ${currentPath === '/projects' ? 'text-white font-medium' : ''}`}
+              >
+                Projects
+              </Link>
+              <Link
+                to="/users"
+                className={`transition-colors hover:text-white ${currentPath === '/users' ? 'text-white font-medium' : ''}`}
+              >
+                Users
+              </Link>
+              <Link
+                to="/reports"
+                className={`transition-colors hover:text-white ${currentPath === '/reports' ? 'text-white font-medium' : ''}`}
+              >
+                Reports
               </Link>
             </>
           )}

@@ -37,7 +37,7 @@ export default function App() {
         <Route
           path="/reports"
           element={
-            <ProtectedRoute roles={['site_engineer', 'admin']}>
+            <ProtectedRoute roles={['site_engineer', 'admin', 'pm']}>
               <MyReportsPage />
             </ProtectedRoute>
           }
@@ -45,7 +45,11 @@ export default function App() {
         <Route
           path="/reports/new"
           element={
-            <ProtectedRoute roles={['site_engineer', 'admin']}>
+            <ProtectedRoute
+              roles={['site_engineer']}
+              redirectTo="/dashboard"
+              redirectMessage="This page is for Site Engineers only. DPR submission is not available for your role."
+            >
               <SubmitReportPage />
             </ProtectedRoute>
           }

@@ -7,6 +7,13 @@ interface ProtectedRouteProps {
   children: ReactNode
   /** If provided, only users with one of these roles can access this route */
   roles?: UserRole[]
+  /**
+   * If set, unauthorized users are redirected here instead of seeing a 403 page.
+   * Pass `redirectMessage` to surface a friendly explanation at the destination.
+   */
+  redirectTo?: string
+  /** Message forwarded via router state to the redirect destination */
+  redirectMessage?: string
 }
 
 /**
@@ -16,7 +23,7 @@ interface ProtectedRouteProps {
  *
  * Shows nothing while session is being restored from localStorage (avoids flash).
  */
-export default function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, roles, redirectTo, redirectMessage }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth()
   const location = useLocation()
 
@@ -48,8 +55,20 @@ export default function ProtectedRoute({ children, roles }: ProtectedRouteProps)
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // Role check — 403 if role not permitted
+  // Role check — redirect or 403 if role not permitted
   if (roles && !roles.includes(user.role)) {
+    // If a specific redirect target is configured, use it and pass along a message
+    if (redirectTo) {
+      return (
+        <Navigate
+          to={redirectTo}
+          state={{ accessDeniedMessage: redirectMessage ?? 'You do not have permission to view that page.' }}
+          replace
+        />
+      )
+    }
+
+    // Default: inline 403 page
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-center">

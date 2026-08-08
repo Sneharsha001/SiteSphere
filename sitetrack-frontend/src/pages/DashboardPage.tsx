@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Header from '../components/Header'
 
@@ -17,6 +19,12 @@ const recentActivity = [
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const location = useLocation()
+
+  // Read the access-denied message passed via router state (from ProtectedRoute redirects)
+  const [accessDeniedMsg, setAccessDeniedMsg] = useState<string | null>(
+    (location.state as { accessDeniedMessage?: string } | null)?.accessDeniedMessage ?? null
+  )
 
   return (
     <div className="min-h-screen bg-slate-900 text-white">
@@ -24,6 +32,28 @@ export default function DashboardPage() {
 
 
       <main className="max-w-7xl mx-auto px-6 py-10">
+        {/* Access-denied redirect banner */}
+        {accessDeniedMsg && (
+          <div
+            role="alert"
+            className="mb-6 flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300"
+          >
+            <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            <span className="text-sm flex-1">{accessDeniedMsg}</span>
+            <button
+              aria-label="Dismiss"
+              onClick={() => setAccessDeniedMsg(null)}
+              className="text-amber-400 hover:text-amber-200 transition-colors cursor-pointer shrink-0"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* Welcome header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white">
