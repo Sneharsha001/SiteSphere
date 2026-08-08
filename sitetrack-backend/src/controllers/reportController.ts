@@ -9,6 +9,7 @@ import { getAccessibleProjectIds } from '../utils/projectAccess'
 import { sendEmail } from '../utils/email'
 import { User } from '../models/User'
 import { Project } from '../models/Project'
+import { AuditLog } from '../models/AuditLog'
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function parseObjectId(id: string, label: string): mongoose.Types.ObjectId {
@@ -296,6 +297,206 @@ export async function getReport(
         ...report,
         photos,
       },
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+// ── PATCH /api/reports/:id (Site Engineer Edit) ───────────────────────────
+
+export async function updateReport(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const reportId = parseObjectId(req.params.id as string, 'report')
+    const { role, userId } = req.user!
+
+    if (role !== 'site_engineer') {
+      throw new AppError('Only Site Engineers can use this endpoint', 403)
+    }
+
+    const report = await DailyProgressReport.findById(reportId)
+    if (!report) {
+      throw new AppError('Daily Progress Report not found', 404)
+    }
+
+    if (!report.engineerId.equals(new mongoose.Types.ObjectId(userId))) {
+      throw new AppError('Access denied: You can only edit your own progress reports', 403)
+    }
+
+    const now = Date.now()
+    const createdAtMs = report.createdAt.getTime()
+    const windowMs = 24 * 60 * 60 * 1000 // 24 hours
+
+    if (now - createdAtMs > windowMs) {
+      throw new AppError('This report is older than 24 hours and cannot be edited directly. Contact an Admin to request a change.', 403)
+    }
+
+    const {
+      workDone,
+      quantity,
+      labourSkilled,
+      labourUnskilled,
+      labourOperators,
+      tomorrowPlan,
+      issues,
+      remarks,
+    } = req.body
+
+    const changes: Record<string, any> = {}
+    const updatePayload: Record<string, any> = {}
+
+    const fieldsToUpdate = [
+      'workDone', 'quantity', 'labourSkilled', 'labourUnskilled',
+      'labourOperators', 'tomorrowPlan', 'issues', 'remarks'
+    ]
+
+    for (const field of fieldsToUpdate) {
+      if (req.body[field] !== undefined) {
+        let newVal = req.body[field]
+        if (['labourSkilled', 'labourUnskilled', 'labourOperators'].includes(field)) {
+          newVal = Number(newVal) || 0
+        }
+        const oldVal = (report as any)[field]
+        if (oldVal !== newVal) {
+          changes[field] = { before: oldVal, after: newVal }
+          updatePayload[field] = newVal
+        }
+      }
+    }
+
+    if (Object.keys(changes).length === 0) {
+      res.status(200).json({ success: true, message: 'No changes detected' })
+      return
+    }
+
+    Object.assign(report, updatePayload)
+    report.editedAt = new Date()
+    await report.save()
+
+    await AuditLog.create({
+      entity: 'DailyProgressReport',
+      entityId: report._id,
+      action: 'engineer_edit',
+      changedBy: new mongoose.Types.ObjectId(userId),
+      changes,
+    })
+
+    res.status(200).json({
+      success: true,
+      message: 'Daily Progress Report updated successfully',
+      data: report,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ── PATCH /api/reports/:id/admin-edit ──────────────────────────────────────
+
+export async function adminUpdateReport(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const reportId = parseObjectId(req.params.id as string, 'report')
+    const { userId } = req.user! // requireRole('admin') handles role check
+
+    const report = await DailyProgressReport.findById(reportId)
+    if (!report) {
+      throw new AppError('Daily Progress Report not found', 404)
+    }
+
+    const {
+      workDone,
+      quantity,
+      labourSkilled,
+      labourUnskilled,
+      labourOperators,
+      tomorrowPlan,
+      issues,
+      remarks,
+    } = req.body
+
+    const changes: Record<string, any> = {}
+    const updatePayload: Record<string, any> = {}
+
+    const fieldsToUpdate = [
+      'workDone', 'quantity', 'labourSkilled', 'labourUnskilled',
+      'labourOperators', 'tomorrowPlan', 'issues', 'remarks'
+    ]
+
+    for (const field of fieldsToUpdate) {
+      if (req.body[field] !== undefined) {
+        let newVal = req.body[field]
+        if (['labourSkilled', 'labourUnskilled', 'labourOperators'].includes(field)) {
+          newVal = Number(newVal) || 0
+        }
+        const oldVal = (report as any)[field]
+        if (oldVal !== newVal) {
+          changes[field] = { before: oldVal, after: newVal }
+          updatePayload[field] = newVal
+        }
+      }
+    }
+
+    if (Object.keys(changes).length === 0) {
+      res.status(200).json({ success: true, message: 'No changes detected' })
+      return
+    }
+
+    Object.assign(report, updatePayload)
+    report.editedAt = new Date()
+    await report.save()
+
+    await AuditLog.create({
+      entity: 'DailyProgressReport',
+      entityId: report._id,
+      action: 'admin_edit_after_window',
+      changedBy: new mongoose.Types.ObjectId(userId),
+      changes,
+    })
+
+    res.status(200).json({
+      success: true,
+      message: 'Daily Progress Report administratively updated successfully',
+      data: report,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ── GET /api/reports/:id/audit ─────────────────────────────────────────────
+
+export async function getReportAudit(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const reportId = parseObjectId(req.params.id as string, 'report')
+    
+    // Check if report exists
+    const report = await DailyProgressReport.findById(reportId).lean()
+    if (!report) {
+      throw new AppError('Daily Progress Report not found', 404)
+    }
+
+    const auditLogs = await AuditLog.find({
+      entity: 'DailyProgressReport',
+      entityId: reportId,
+    })
+      .populate('changedBy', 'name email role')
+      .sort({ changedAt: -1 })
+      .lean()
+
+    res.status(200).json({
+      success: true,
+      data: auditLogs,
     })
   } catch (err) {
     next(err)

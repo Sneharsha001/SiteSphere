@@ -6,6 +6,7 @@ export interface IAuditLog extends Document {
   action: string
   changedBy: mongoose.Types.ObjectId
   changedAt: Date
+  changes?: Record<string, any>
 }
 
 const auditLogSchema = new Schema<IAuditLog>(
@@ -30,6 +31,9 @@ const auditLogSchema = new Schema<IAuditLog>(
     changedAt: {
       type: Date,
       default: Date.now,
+    },
+    changes: {
+      type: Schema.Types.Mixed,
     },
   },
   {
