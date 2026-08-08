@@ -6,7 +6,9 @@ import { ProjectAssignment } from '../models/ProjectAssignment'
 import { AppError } from '../middleware/errorHandler'
 import { uploadBufferToCloudinary } from '../config/cloudinary'
 import { getAccessibleProjectIds } from '../utils/projectAccess'
-
+import { sendEmail } from '../utils/email'
+import { User } from '../models/User'
+import { Project } from '../models/Project'
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function parseObjectId(id: string, label: string): mongoose.Types.ObjectId {
@@ -112,6 +114,56 @@ export async function createReport(
         timestamp: new Date(),
       })
       photoDocs.push(photoDoc)
+    }
+
+    // 6. Send Email Notifications to Project Managers
+    try {
+      // Find all PMs assigned to this project
+      const pmAssignments = await ProjectAssignment.find({
+        projectId: parsedProjectId,
+        roleOnProject: 'Project Manager',
+      }).lean()
+
+      if (pmAssignments.length === 0) {
+        console.warn(`No Project Manager assigned to project ${projectId}; skipping email notification.`)
+      } else {
+        const pmIds = pmAssignments.map((a) => a.userId)
+        const pms = await User.find({ _id: { $in: pmIds }, role: 'pm' }).lean()
+
+        if (pms.length > 0) {
+          const project = await Project.findById(parsedProjectId).lean()
+          const engineer = await User.findById(userId).lean()
+
+          const projectName = project?.name || 'Unknown Project'
+          const engName = engineer?.name || 'Unknown Engineer'
+          const dateStr = reportDate.toISOString().split('T')[0]
+
+          const subject = `New Daily Progress Report — ${projectName} — ${dateStr}`
+          const excerpt = workDone.length > 150 ? workDone.substring(0, 150) + '...' : workDone
+
+          const html = `
+            <h2>New Daily Progress Report</h2>
+            <p><strong>Project:</strong> ${projectName}</p>
+            <p><strong>Engineer:</strong> ${engName}</p>
+            <p><strong>Date:</strong> ${dateStr}</p>
+            <br/>
+            <h3>Work Done:</h3>
+            <p>${excerpt}</p>
+            ${issues ? `<h3>⚠️ Issues Flagged:</h3><p>${issues}</p>` : ''}
+            <br/>
+            <p><em>Log in to SiteTrack to view the full report and attached photos.</em></p>
+          `
+
+          const pmEmails = pms.map((pm) => pm.email)
+          
+          // Send email without awaiting to prevent blocking the response, or await it because we catch errors inside sendEmail.
+          // Since sendEmail has its own try/catch, awaiting is fine and ensures we log the preview URL before the process exits during tests.
+          await sendEmail(pmEmails, subject, html)
+        }
+      }
+    } catch (emailErr) {
+      console.warn('⚠️ Unexpected error during email notification process:', emailErr)
+      // Do NOT throw. Let the DPR creation succeed.
     }
 
     res.status(201).json({
