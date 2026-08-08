@@ -86,7 +86,7 @@ export default function Header() {
             </>
           )}
 
-          {/* ── PM: Dashboard + Projects + Reports (view-only) ── */}
+          {/* ── PM: Dashboard ── */}
           {user?.role === 'pm' && (
             <>
               <Link
@@ -95,22 +95,10 @@ export default function Header() {
               >
                 Dashboard
               </Link>
-              <Link
-                to="/projects"
-                className={`transition-colors hover:text-white ${currentPath === '/projects' ? 'text-white font-medium' : ''}`}
-              >
-                Projects
-              </Link>
-              <Link
-                to="/reports"
-                className={`transition-colors hover:text-white ${currentPath === '/reports' ? 'text-white font-medium' : ''}`}
-              >
-                Reports
-              </Link>
             </>
           )}
 
-          {/* ── Admin: Dashboard + Projects + Users + Reports (view-only) ── */}
+          {/* ── Admin: Dashboard + Projects + Users ── */}
           {user?.role === 'admin' && (
             <>
               <Link
@@ -130,12 +118,6 @@ export default function Header() {
                 className={`transition-colors hover:text-white ${currentPath === '/users' ? 'text-white font-medium' : ''}`}
               >
                 Users
-              </Link>
-              <Link
-                to="/reports"
-                className={`transition-colors hover:text-white ${currentPath === '/reports' ? 'text-white font-medium' : ''}`}
-              >
-                Reports
               </Link>
             </>
           )}

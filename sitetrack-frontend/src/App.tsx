@@ -32,21 +32,29 @@ export default function App() {
           }
         />
         <Route
-          path="/projects"
-          element={
-            <ProtectedRoute>
-              <ProjectsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reports"
-          element={
-            <ProtectedRoute roles={['site_engineer', 'admin', 'pm']}>
-              <MyReportsPage />
-            </ProtectedRoute>
-          }
-        />
+           path="/projects"
+           element={
+             <ProtectedRoute
+               roles={['admin']}
+               redirectTo="/dashboard"
+               redirectMessage="Project management is restricted to Administrators."
+             >
+               <ProjectsPage />
+             </ProtectedRoute>
+           }
+         />
+         <Route
+           path="/reports"
+           element={
+             <ProtectedRoute
+               roles={['site_engineer']}
+               redirectTo="/dashboard"
+               redirectMessage="Personal report list is restricted to Site Engineers."
+             >
+               <MyReportsPage />
+             </ProtectedRoute>
+           }
+         />
         <Route
           path="/reports/new"
           element={
