@@ -40,6 +40,48 @@ export interface Project {
   updatedAt: string
 }
 
+// ── Daily Progress Report (Dashboard) ─────────────────────────────────────
+
+export interface ReportPhoto {
+  _id: string
+  fileUrl: string
+  timestamp: string
+}
+
+export interface DashboardDpr {
+  _id: string
+  date: string
+  createdAt: string
+  workDone: string
+  quantity?: string
+  labourSkilled: number
+  labourUnskilled: number
+  labourOperators: number
+  tomorrowPlan?: string
+  issues?: string
+  remarks?: string
+  syncStatus: 'synced' | 'pending'
+  projectId: {
+    _id: string
+    name: string
+    buildingType?: string
+    location?: string
+  }
+  engineerId: {
+    _id: string
+    name: string
+    email: string
+  }
+  photos: ReportPhoto[]
+}
+
+export interface DashboardKpis {
+  reportsThisWeek: number
+  reportsThisMonth: number
+  openIssues: number
+  activeProjects: number
+}
+
 // ── API Response wrappers ─────────────────────────────────────────────────
 
 export interface ApiSuccess<T> {

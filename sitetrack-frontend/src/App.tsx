@@ -21,7 +21,11 @@ export default function App() {
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute
+              roles={['pm', 'admin']}
+              redirectTo="/reports"
+              redirectMessage="The dashboard is for Project Managers and Admins only. You've been redirected to your reports."
+            >
               <DashboardPage />
             </ProtectedRoute>
           }
