@@ -367,6 +367,29 @@ export async function updateReport(
       }
     }
 
+    // Handle photo uploads if any
+    const files = (req.files as Express.Multer.File[]) || []
+    const photoDocs = []
+
+    if (files.length > 0) {
+      // Fetch count of existing photos for this report
+      const existingPhotosCount = await ReportPhoto.countDocuments({ reportId: report._id })
+      if (existingPhotosCount + files.length > 5) {
+        throw new AppError(`Upload limit exceeded: A report can have at most 5 photos. (Already has ${existingPhotosCount})`, 400)
+      }
+
+      for (const file of files) {
+        const fileUrl = await uploadBufferToCloudinary(file.buffer, 'sitetrack/dpr_photos')
+        const photoDoc = await ReportPhoto.create({
+          reportId: report._id,
+          fileUrl,
+          timestamp: new Date(),
+        })
+        photoDocs.push(photoDoc)
+      }
+      changes.photos = { added: photoDocs.map(p => p.fileUrl) }
+    }
+
     if (Object.keys(changes).length === 0) {
       res.status(200).json({ success: true, message: 'No changes detected' })
       return
@@ -384,10 +407,15 @@ export async function updateReport(
       changes,
     })
 
+    const allPhotos = await ReportPhoto.find({ reportId: report._id }).lean()
+
     res.status(200).json({
       success: true,
       message: 'Daily Progress Report updated successfully',
-      data: report,
+      data: {
+        ...report.toObject(),
+        photos: allPhotos,
+      },
     })
   } catch (err) {
     next(err)
@@ -443,6 +471,29 @@ export async function adminUpdateReport(
       }
     }
 
+    // Handle photo uploads if any
+    const files = (req.files as Express.Multer.File[]) || []
+    const photoDocs = []
+
+    if (files.length > 0) {
+      // Fetch count of existing photos for this report
+      const existingPhotosCount = await ReportPhoto.countDocuments({ reportId: report._id })
+      if (existingPhotosCount + files.length > 5) {
+        throw new AppError(`Upload limit exceeded: A report can have at most 5 photos. (Already has ${existingPhotosCount})`, 400)
+      }
+
+      for (const file of files) {
+        const fileUrl = await uploadBufferToCloudinary(file.buffer, 'sitetrack/dpr_photos')
+        const photoDoc = await ReportPhoto.create({
+          reportId: report._id,
+          fileUrl,
+          timestamp: new Date(),
+        })
+        photoDocs.push(photoDoc)
+      }
+      changes.photos = { added: photoDocs.map(p => p.fileUrl) }
+    }
+
     if (Object.keys(changes).length === 0) {
       res.status(200).json({ success: true, message: 'No changes detected' })
       return
@@ -460,10 +511,15 @@ export async function adminUpdateReport(
       changes,
     })
 
+    const allPhotos = await ReportPhoto.find({ reportId: report._id }).lean()
+
     res.status(200).json({
       success: true,
       message: 'Daily Progress Report administratively updated successfully',
-      data: report,
+      data: {
+        ...report.toObject(),
+        photos: allPhotos,
+      },
     })
   } catch (err) {
     next(err)

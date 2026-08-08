@@ -31,10 +31,10 @@ router.get('/', listReports)
 router.get('/:id', getReport)
 
 // PATCH /api/reports/:id — Site Engineer edits their own DPR (within 24 hours)
-router.patch('/:id', requireRole('site_engineer'), updateReport)
+router.patch('/:id', requireRole('site_engineer'), handlePhotoUpload, updateReport)
 
 // PATCH /api/reports/:id/admin-edit — Admin override edit (any time)
-router.patch('/:id/admin-edit', requireRole('admin'), adminUpdateReport)
+router.patch('/:id/admin-edit', requireRole('admin'), handlePhotoUpload, adminUpdateReport)
 
 // GET /api/reports/:id/audit — Admin views audit history
 router.get('/:id/audit', requireRole('admin'), getReportAudit)

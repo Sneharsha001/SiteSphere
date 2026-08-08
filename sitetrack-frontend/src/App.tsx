@@ -7,6 +7,7 @@ import ProjectsPage from './pages/ProjectsPage'
 import SubmitReportPage from './pages/SubmitReportPage'
 import MyReportsPage from './pages/MyReportsPage'
 import ReportDetailPage from './pages/ReportDetailPage'
+import EditReportPage from './pages/EditReportPage'
 
 export default function App() {
   return (
@@ -64,6 +65,18 @@ export default function App() {
               redirectMessage="This page is for Site Engineers only. DPR submission is not available for your role."
             >
               <SubmitReportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/:id/edit"
+          element={
+            <ProtectedRoute
+              roles={['site_engineer']}
+              redirectTo="/dashboard"
+              redirectMessage="This page is for Site Engineers only."
+            >
+              <EditReportPage />
             </ProtectedRoute>
           }
         />
