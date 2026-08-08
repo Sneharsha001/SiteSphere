@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage'
 import ProjectsPage from './pages/ProjectsPage'
 import SubmitReportPage from './pages/SubmitReportPage'
 import MyReportsPage from './pages/MyReportsPage'
+import ReportDetailPage from './pages/ReportDetailPage'
 
 export default function App() {
   return (
@@ -55,6 +56,19 @@ export default function App() {
               redirectMessage="This page is for Site Engineers only. DPR submission is not available for your role."
             >
               <SubmitReportPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Report detail view — PM/Admin read-only */}
+        <Route
+          path="/reports/:id"
+          element={
+            <ProtectedRoute
+              roles={['pm', 'admin']}
+              redirectTo="/reports"
+              redirectMessage="The report detail view is only available to Project Managers and Admins."
+            >
+              <ReportDetailPage />
             </ProtectedRoute>
           }
         />
