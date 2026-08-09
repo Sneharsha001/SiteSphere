@@ -2,18 +2,37 @@ import { CorsOptions } from 'cors'
 
 /**
  * CORS options that allow requests from the FRONTEND_URL env variable.
- * Falls back to http://localhost:5173 for local development.
+ * Supports multiple origins via comma-separated values.
+ * Falls back to localhost + production Render frontend.
  */
+
+const ALWAYS_ALLOWED = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://sitesphere-cbch.onrender.com', // production frontend
+]
+
+function getAllowedOrigins(): string[] {
+  const env = process.env.FRONTEND_URL ?? ''
+  const envOrigins = env
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return [...new Set([...ALWAYS_ALLOWED, ...envOrigins])]
+}
+
 export const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
-    const allowedOrigin = process.env.FRONTEND_URL ?? 'http://localhost:5173'
-
-    // Allow requests with no origin (e.g. curl, Postman, server-to-server)
+    // Allow requests with no origin (curl, Postman, server-to-server)
     if (!origin) {
       return callback(null, true)
     }
 
-    if (origin === allowedOrigin || /^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+    const allowed = getAllowedOrigins()
+    if (
+      allowed.includes(origin) ||
+      /^https?:\/\/localhost(:\d+)?$/.test(origin)
+    ) {
       callback(null, true)
     } else {
       callback(new Error(`CORS: origin '${origin}' is not allowed`))
