@@ -522,8 +522,14 @@ export default function ReportDetailPage() {
             )}
 
             {/* ── ADMIN-ONLY: Audit Log + Admin Override Edit ────────────── */}
+            {/* NOTE: This entire section is intentionally hidden from PM role — only 'admin' sees it. */}
             {user?.role === 'admin' && (
-              <section className="border-t border-white/10 pt-8" id="audit-section">
+              <section
+                className="border-t border-white/10 pt-8"
+                id="audit-section"
+                data-testid="audit-section"
+                aria-label="Audit History — Admin Only"
+              >
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-2">
                     <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -534,6 +540,8 @@ export default function ReportDetailPage() {
                   </div>
                   <button
                     id="admin-override-edit-btn"
+                    data-testid="admin-override-edit-btn"
+                    aria-label="Admin Override Edit — bypasses 24-hour safety window"
                     onClick={handleAdminEditOpen}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600/15 hover:bg-amber-600/25 border border-amber-500/30 hover:border-amber-400/50 text-amber-300 text-xs font-semibold transition-all"
                   >
