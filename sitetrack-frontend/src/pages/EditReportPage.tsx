@@ -81,7 +81,7 @@ export default function EditReportPage() {
           const createdAtMs = new Date(report.createdAt).getTime()
           const timeDiff = Date.now() - createdAtMs
           const windowMs = 24 * 60 * 60 * 1000
-          if (timeDiff > windowMs) {
+          if (timeDiff >= windowMs) {
             setWindowExpired(true)
           }
 
@@ -182,8 +182,13 @@ export default function EditReportPage() {
         navigate('/reports')
       }, 1200)
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Failed to update report. Please try again.'
-      setSubmitError(msg)
+      if (err.response?.status === 403) {
+        setWindowExpired(true)
+        setSubmitError('This report can no longer be edited directly (24-hour window passed). Contact an Admin if a change is needed.')
+      } else {
+        const msg = err.response?.data?.message || 'Failed to update report. Please try again.'
+        setSubmitError(msg)
+      }
     } finally {
       setIsSubmitting(false)
     }

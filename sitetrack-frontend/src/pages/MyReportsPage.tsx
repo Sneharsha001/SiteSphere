@@ -478,22 +478,31 @@ export default function MyReportsPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-white/10 flex justify-end gap-3 bg-slate-900">
-              {detailedReport && (Date.now() - new Date(detailedReport.createdAt).getTime() < 24 * 60 * 60 * 1000) && (
-                <Link
-                  id="edit-dpr-btn"
-                  to={`/reports/${detailedReport._id}/edit`}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-sm font-medium text-white rounded-xl transition-colors shadow-lg shadow-indigo-500/20"
+            <div className="px-6 py-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900">
+              <div className="flex-1 text-left">
+                {detailedReport && (Date.now() - new Date(detailedReport.createdAt).getTime() >= 24 * 60 * 60 * 1000) && (
+                  <span className="text-slate-500 text-xs italic block">
+                    This report can no longer be edited directly (24-hour window passed). Contact an Admin if a change is needed.
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                {detailedReport && (Date.now() - new Date(detailedReport.createdAt).getTime() < 24 * 60 * 60 * 1000) && (
+                  <Link
+                    id="edit-dpr-btn"
+                    to={`/reports/${detailedReport._id}/edit`}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-sm font-medium text-white rounded-xl transition-colors shadow-lg shadow-indigo-500/20"
+                  >
+                    Edit Report
+                  </Link>
+                )}
+                <button
+                  onClick={handleCloseDetail}
+                  className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-sm font-medium text-white rounded-xl transition-colors border border-white/10"
                 >
-                  Edit Report
-                </Link>
-              )}
-              <button
-                onClick={handleCloseDetail}
-                className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-sm font-medium text-white rounded-xl transition-colors border border-white/10"
-              >
-                Close
-              </button>
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

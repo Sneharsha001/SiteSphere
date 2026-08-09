@@ -558,7 +558,7 @@ export default function ReportDetailPage() {
                   </div>
                 ) : (
                   <ol className="relative border-l border-white/10 space-y-0 ml-2">
-                    {auditLogs.map((entry, idx) => (
+                    {auditLogs.map((entry) => (
                       <li key={entry._id} className="mb-6 ml-5">
                         {/* Timeline dot */}
                         <span className={`absolute -left-[9px] w-4 h-4 rounded-full border-2 ${
