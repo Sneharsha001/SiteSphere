@@ -5,6 +5,16 @@ import { useAuth } from '../context/AuthContext'
 import Header from '../components/Header'
 import type { ReportPhoto } from '../types'
 
+// ── Audit Log type ────────────────────────────────────────────────────────
+
+interface AuditEntry {
+  _id: string
+  action: string
+  changedBy: { _id: string; name: string; email: string; role: string }
+  changedAt: string
+  changes: Record<string, { before?: any; after?: any } | any>
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────
 
 interface ReportDetail {
@@ -126,6 +136,17 @@ export default function ReportDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Audit log state (Admin only)
+  const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([])
+  const [auditLoading, setAuditLoading] = useState(false)
+
+  // Admin Override Edit state
+  const [showAdminEdit, setShowAdminEdit] = useState(false)
+  const [adminEditFields, setAdminEditFields] = useState<Record<string, any>>({})
+  const [adminEditError, setAdminEditError] = useState<string | null>(null)
+  const [adminEditSuccess, setAdminEditSuccess] = useState(false)
+  const [adminEditSubmitting, setAdminEditSubmitting] = useState(false)
+
   // Lightbox state — reused directly from MyReportsPage pattern
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null)
   const [zoomIndex, setZoomIndex] = useState<number>(0)
@@ -151,6 +172,60 @@ export default function ReportDetailPage() {
   useEffect(() => {
     fetchReport()
   }, [fetchReport])
+
+  // Fetch audit logs (Admin only)
+  const fetchAuditLogs = useCallback(async () => {
+    if (!id || user?.role !== 'admin') return
+    setAuditLoading(true)
+    try {
+      const res = await api.get(`/reports/${id}/audit`)
+      setAuditLogs(res.data?.data ?? [])
+    } catch {
+      // silently ignore
+    } finally {
+      setAuditLoading(false)
+    }
+  }, [id, user?.role])
+
+  useEffect(() => {
+    fetchAuditLogs()
+  }, [fetchAuditLogs])
+
+  // Admin Override Edit handlers
+  const handleAdminEditOpen = () => {
+    if (!report) return
+    setAdminEditFields({
+      workDone: report.workDone,
+      quantity: report.quantity || '',
+      labourSkilled: report.labourSkilled,
+      labourUnskilled: report.labourUnskilled,
+      labourOperators: report.labourOperators,
+      tomorrowPlan: report.tomorrowPlan || '',
+      issues: report.issues || '',
+      remarks: report.remarks || '',
+    })
+    setAdminEditError(null)
+    setAdminEditSuccess(false)
+    setShowAdminEdit(true)
+  }
+
+  const handleAdminEditSubmit = async () => {
+    if (!id) return
+    setAdminEditSubmitting(true)
+    setAdminEditError(null)
+    try {
+      await api.patch(`/reports/${id}/admin-edit`, adminEditFields)
+      setAdminEditSuccess(true)
+      // Refresh report + audit logs
+      await fetchReport()
+      await fetchAuditLogs()
+      setTimeout(() => setShowAdminEdit(false), 1500)
+    } catch (err: any) {
+      setAdminEditError(err.response?.data?.message || 'Failed to save admin override edit.')
+    } finally {
+      setAdminEditSubmitting(false)
+    }
+  }
 
   // ── Keyboard navigation for lightbox ────────────────────────────────────
   useEffect(() => {
@@ -446,6 +521,107 @@ export default function ReportDetailPage() {
               </div>
             )}
 
+            {/* ── ADMIN-ONLY: Audit Log + Admin Override Edit ────────────── */}
+            {user?.role === 'admin' && (
+              <section className="border-t border-white/10 pt-8" id="audit-section">
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <h2 className="text-base font-semibold text-white">Audit History</h2>
+                    <span className="text-xs text-slate-500 font-normal">Admin only</span>
+                  </div>
+                  <button
+                    id="admin-override-edit-btn"
+                    onClick={handleAdminEditOpen}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600/15 hover:bg-amber-600/25 border border-amber-500/30 hover:border-amber-400/50 text-amber-300 text-xs font-semibold transition-all"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Admin Override Edit
+                  </button>
+                </div>
+
+                {auditLoading ? (
+                  <div className="flex items-center gap-2 py-6 text-slate-400 text-sm">
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                    </svg>
+                    Loading audit history...
+                  </div>
+                ) : auditLogs.length === 0 ? (
+                  <div className="py-6 px-5 rounded-xl bg-white/5 border border-white/10 text-sm text-slate-400">
+                    No edits have been made to this report.
+                  </div>
+                ) : (
+                  <ol className="relative border-l border-white/10 space-y-0 ml-2">
+                    {auditLogs.map((entry, idx) => (
+                      <li key={entry._id} className="mb-6 ml-5">
+                        {/* Timeline dot */}
+                        <span className={`absolute -left-[9px] w-4 h-4 rounded-full border-2 ${
+                          entry.action === 'admin_edit_after_window'
+                            ? 'bg-amber-500 border-amber-400'
+                            : 'bg-indigo-500 border-indigo-400'
+                        }`} />
+
+                        {/* Entry card */}
+                        <div className={`p-4 rounded-xl border text-sm ${
+                          entry.action === 'admin_edit_after_window'
+                            ? 'bg-amber-500/5 border-amber-500/20'
+                            : 'bg-white/5 border-white/10'
+                        }`}>
+                          <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+                            <div>
+                              <span className={`inline-block px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider mr-2 ${
+                                entry.action === 'admin_edit_after_window'
+                                  ? 'bg-amber-500/15 text-amber-300'
+                                  : 'bg-indigo-500/15 text-indigo-300'
+                              }`}>
+                                {entry.action === 'admin_edit_after_window' ? '⚠ Admin Override' : '✎ Engineer Edit'}
+                              </span>
+                              <span className="text-slate-300 font-medium">{entry.changedBy.name}</span>
+                              <span className="text-slate-500 ml-1">({entry.changedBy.email})</span>
+                            </div>
+                            <time className="text-xs text-slate-500 shrink-0">
+                              {new Date(entry.changedAt).toLocaleString('en-IN', {
+                                day: '2-digit', month: 'short', year: 'numeric',
+                                hour: '2-digit', minute: '2-digit',
+                              })}
+                            </time>
+                          </div>
+
+                          {/* Changes list */}
+                          <div className="space-y-1.5">
+                            {Object.entries(entry.changes).map(([field, change]) => {
+                              if (field === 'photos') return (
+                                <div key={field} className="text-xs text-slate-400">
+                                  <span className="font-semibold text-slate-300">Photos:</span>{' '}
+                                  {(change as any).added?.length ?? 0} new photo(s) added
+                                </div>
+                              )
+                              const c = change as { before?: any; after?: any }
+                              return (
+                                <div key={field} className="text-xs">
+                                  <span className="font-semibold text-slate-300 capitalize">{field.replace(/([A-Z])/g, ' $1')}:</span>{' '}
+                                  {c.before !== undefined && (
+                                    <span className="text-red-400 line-through mr-1">{String(c.before || '—')}</span>
+                                  )}
+                                  <span className="text-emerald-400">{String(c.after ?? '—')}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+            )}
+
             {/* ── Footer actions — read-only, back button only ───────────── */}
             <div className="mt-10 pt-6 border-t border-white/10 flex items-center justify-between">
               <button
@@ -462,6 +638,102 @@ export default function ReportDetailPage() {
           </article>
         )}
       </main>
+
+      {/* ── ADMIN OVERRIDE EDIT MODAL ────────────────────────────────────── */}
+      {showAdminEdit && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-amber-500/30 rounded-2xl w-full max-w-2xl shadow-2xl">
+
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-amber-500/20 flex items-center justify-between bg-amber-500/5 rounded-t-2xl">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <h2 className="text-base font-bold text-amber-300">Admin Override Edit</h2>
+                <span className="text-[10px] text-amber-400/60 font-medium">Bypasses 24-hour window</span>
+              </div>
+              <button onClick={() => setShowAdminEdit(false)} className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Warning Banner */}
+            <div className="mx-6 mt-5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300/80 text-xs">
+              ⚠ This is an administrator override. Every change made here will be recorded in the audit log with your identity.
+            </div>
+
+            {/* Form fields */}
+            <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+              {adminEditSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm font-semibold flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Saved successfully. Audit entry created.
+                </div>
+              )}
+              {adminEditError && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+                  {adminEditError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Work Done *</label>
+                <textarea rows={3} value={adminEditFields.workDone || ''} onChange={e => setAdminEditFields(f => ({...f, workDone: e.target.value}))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Quantity</label>
+                <input type="text" value={adminEditFields.quantity || ''} onChange={e => setAdminEditFields(f => ({...f, quantity: e.target.value}))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors" />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {(['labourSkilled', 'labourUnskilled', 'labourOperators'] as const).map((f) => (
+                  <div key={f}>
+                    <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">{f.replace('labour', '').replace(/([A-Z])/g, ' $1').trim()}</label>
+                    <input type="number" min={0} value={adminEditFields[f] ?? 0} onChange={e => setAdminEditFields(prev => ({...prev, [f]: Number(e.target.value)}))}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors" />
+                  </div>
+                ))}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Tomorrow's Plan</label>
+                <textarea rows={2} value={adminEditFields.tomorrowPlan || ''} onChange={e => setAdminEditFields(f => ({...f, tomorrowPlan: e.target.value}))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Issues / Blockers</label>
+                <textarea rows={2} value={adminEditFields.issues || ''} onChange={e => setAdminEditFields(f => ({...f, issues: e.target.value}))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Remarks</label>
+                <textarea rows={2} value={adminEditFields.remarks || ''} onChange={e => setAdminEditFields(f => ({...f, remarks: e.target.value}))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors" />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-white/10 flex justify-end gap-3">
+              <button onClick={() => setShowAdminEdit(false)}
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-white rounded-xl transition-colors">
+                Cancel
+              </button>
+              <button
+                id="admin-edit-save-btn"
+                onClick={handleAdminEditSubmit}
+                disabled={adminEditSubmitting || adminEditSuccess}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-sm font-semibold text-white rounded-xl transition-colors">
+                {adminEditSubmitting ? 'Saving Override...' : 'Save Admin Override'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── LIGHTBOX OVERLAY — reused from MyReportsPage pattern ────────────── */}
       {zoomImageUrl && (

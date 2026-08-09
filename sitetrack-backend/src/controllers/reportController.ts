@@ -6,7 +6,7 @@ import { ProjectAssignment } from '../models/ProjectAssignment'
 import { AppError } from '../middleware/errorHandler'
 import { uploadBufferToCloudinary } from '../config/cloudinary'
 import { getAccessibleProjectIds } from '../utils/projectAccess'
-import { sendEmail } from '../utils/email'
+import { sendEmail, buildNewDprEmailHtml } from '../utils/email'
 import { User } from '../models/User'
 import { Project } from '../models/Project'
 import { AuditLog } from '../models/AuditLog'
@@ -119,52 +119,69 @@ export async function createReport(
 
     // 6. Send Email Notifications to Project Managers
     try {
-      // Find all PMs assigned to this project
-      const pmAssignments = await ProjectAssignment.find({
+      // ── Strategy: find all users with role 'pm' who are assigned to this project.
+      //   We join ProjectAssignment → User so that any PM assignment (regardless of
+      //   the roleOnProject label) triggers the notification, as long as the user's
+      //   system role is 'pm'. This is more robust than matching on the roleOnProject
+      //   string which varies by how the assignment was created.
+      const allAssignments = await ProjectAssignment.find({
         projectId: parsedProjectId,
-        roleOnProject: 'Project Manager',
-      }).lean()
+      })
+        .select('userId')
+        .lean()
 
-      if (pmAssignments.length === 0) {
-        console.warn(`No Project Manager assigned to project ${projectId}; skipping email notification.`)
+      if (allAssignments.length === 0) {
+        console.warn(`⚠️ No users assigned to project ${projectId}; skipping email notification.`)
       } else {
-        const pmIds = pmAssignments.map((a) => a.userId)
-        const pms = await User.find({ _id: { $in: pmIds }, role: 'pm' }).lean()
+        const assignedUserIds = allAssignments.map((a) => a.userId)
 
-        if (pms.length > 0) {
+        // Filter to only those with system role 'pm' (active)
+        const pms = await User.find({
+          _id: { $in: assignedUserIds },
+          role: 'pm',
+          status: 'active',
+        }).lean()
+
+        if (pms.length === 0) {
+          console.warn(`⚠️ No active PM found among users assigned to project ${projectId}; skipping email.`)
+        } else {
           const project = await Project.findById(parsedProjectId).lean()
           const engineer = await User.findById(userId).lean()
 
           const projectName = project?.name || 'Unknown Project'
           const engName = engineer?.name || 'Unknown Engineer'
           const dateStr = reportDate.toISOString().split('T')[0]
+          const labourTotal =
+            (Number(labourSkilled) || 0) +
+            (Number(labourUnskilled) || 0) +
+            (Number(labourOperators) || 0)
 
           const subject = `New Daily Progress Report — ${projectName} — ${dateStr}`
-          const excerpt = workDone.length > 150 ? workDone.substring(0, 150) + '...' : workDone
+          const workDoneExcerpt = workDone.length > 200 ? workDone.substring(0, 200) + '…' : workDone
 
-          const html = `
-            <h2>New Daily Progress Report</h2>
-            <p><strong>Project:</strong> ${projectName}</p>
-            <p><strong>Engineer:</strong> ${engName}</p>
-            <p><strong>Date:</strong> ${dateStr}</p>
-            <br/>
-            <h3>Work Done:</h3>
-            <p>${excerpt}</p>
-            ${issues ? `<h3>⚠️ Issues Flagged:</h3><p>${issues}</p>` : ''}
-            <br/>
-            <p><em>Log in to SiteTrack to view the full report and attached photos.</em></p>
-          `
+          const html = buildNewDprEmailHtml({
+            projectName,
+            engineerName: engName,
+            dateStr,
+            workDoneExcerpt,
+            issues: issues || undefined,
+            tomorrowPlan: tomorrowPlan || undefined,
+            labourTotal,
+            photoCount: photoDocs.length,
+          })
 
           const pmEmails = pms.map((pm) => pm.email)
-          
-          // Send email without awaiting to prevent blocking the response, or await it because we catch errors inside sendEmail.
-          // Since sendEmail has its own try/catch, awaiting is fine and ensures we log the preview URL before the process exits during tests.
+          console.log(`📧 Sending DPR notification to PM(s): ${pmEmails.join(', ')}`)
+
+          // Awaiting is fine here — sendEmail has its own internal try/catch and
+          // will never throw. Awaiting ensures the Ethereal preview URL is logged
+          // to the console before the process exits in test scenarios.
           await sendEmail(pmEmails, subject, html)
         }
       }
     } catch (emailErr) {
       console.warn('⚠️ Unexpected error during email notification process:', emailErr)
-      // Do NOT throw. Let the DPR creation succeed.
+      // Do NOT throw. Let the DPR creation succeed regardless of email outcome.
     }
 
     res.status(201).json({
