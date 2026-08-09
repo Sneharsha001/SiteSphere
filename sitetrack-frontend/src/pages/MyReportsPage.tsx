@@ -348,22 +348,23 @@ export default function MyReportsPage() {
 
       {/* ── DETAIL MODAL OVERLAY ───────────────────────────────────────────── */}
       {activeReportId && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col shadow-2xl">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto flex flex-col shadow-2xl">
             
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur z-10">
-              <div>
-                <span className="text-xs text-indigo-400 font-semibold uppercase tracking-wider">
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-white/10 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur z-10">
+              <div className="min-w-0 pr-2">
+                <span className="text-[11px] sm:text-xs text-indigo-400 font-semibold uppercase tracking-wider block">
                   {detailedReport ? formatDate(detailedReport.date) : 'Loading...'}
                 </span>
-                <h2 className="text-xl font-bold text-white leading-tight">
+                <h2 className="text-lg sm:text-xl font-bold text-white leading-tight truncate">
                   {detailedReport ? detailedReport.projectId?.name : 'Report Details'}
                 </h2>
               </div>
               <button
                 onClick={handleCloseDetail}
-                className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+                className="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors shrink-0"
+                aria-label="Close details"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -372,9 +373,9 @@ export default function MyReportsPage() {
             </div>
 
             {/* Modal Content */}
-            <div className="p-6 space-y-8 flex-1">
+            <div className="p-4 sm:p-6 space-y-6 sm:space-y-8 flex-1">
               {loadingDetail ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <svg className="animate-spin w-8 h-8 text-indigo-500" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
@@ -384,47 +385,47 @@ export default function MyReportsPage() {
               ) : detailedReport ? (
                 <>
                   {/* Grid details */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                     {/* Work done */}
-                    <div className="md:col-span-2 bg-white/5 border border-white/10 rounded-xl p-5">
-                      <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Work Done Description</h4>
+                    <div className="md:col-span-2 bg-white/5 border border-white/10 rounded-xl p-4 sm:p-5">
+                      <h4 className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Work Done Description</h4>
                       <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{detailedReport.workDone}</p>
                     </div>
 
                     {/* Quantity Executed */}
-                    <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-                      <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Quantity Executed</h4>
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-5">
+                      <h4 className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Quantity Executed</h4>
                       <p className="text-sm text-slate-200">{detailedReport.quantity || 'None logged'}</p>
                     </div>
 
                     {/* Workforce Deployed */}
-                    <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-                      <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Workforce Deployed</h4>
-                      <div className="grid grid-cols-3 gap-4 text-center">
-                        <div className="bg-slate-800/50 rounded-lg p-2.5 border border-white/5">
-                          <span className="block text-lg font-bold text-white">{detailedReport.labourSkilled}</span>
-                          <span className="text-[10px] text-slate-400 font-medium">Skilled</span>
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-5">
+                      <h4 className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 sm:mb-3">Workforce Deployed</h4>
+                      <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
+                        <div className="bg-slate-800/50 rounded-lg p-2 sm:p-2.5 border border-white/5">
+                          <span className="block text-base sm:text-lg font-bold text-white">{detailedReport.labourSkilled}</span>
+                          <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium uppercase tracking-wide">Skilled</span>
                         </div>
-                        <div className="bg-slate-800/50 rounded-lg p-2.5 border border-white/5">
-                          <span className="block text-lg font-bold text-white">{detailedReport.labourUnskilled}</span>
-                          <span className="text-[10px] text-slate-400 font-medium">Unskilled</span>
+                        <div className="bg-slate-800/50 rounded-lg p-2 sm:p-2.5 border border-white/5">
+                          <span className="block text-base sm:text-lg font-bold text-white">{detailedReport.labourUnskilled}</span>
+                          <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium uppercase tracking-wide">Unskilled</span>
                         </div>
-                        <div className="bg-slate-800/50 rounded-lg p-2.5 border border-white/5">
-                          <span className="block text-lg font-bold text-white">{detailedReport.labourOperators}</span>
-                          <span className="text-[10px] text-slate-400 font-medium">Operators</span>
+                        <div className="bg-slate-800/50 rounded-lg p-2 sm:p-2.5 border border-white/5">
+                          <span className="block text-base sm:text-lg font-bold text-white">{detailedReport.labourOperators}</span>
+                          <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium uppercase tracking-wide">Operators</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Tomorrow's Plan */}
-                    <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-                      <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tomorrow's Plan</h4>
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-5">
+                      <h4 className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tomorrow's Plan</h4>
                       <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{detailedReport.tomorrowPlan || 'None logged'}</p>
                     </div>
 
                     {/* Issues / Blockers */}
-                    <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-                      <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Issues / Blockers</h4>
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-5">
+                      <h4 className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Issues / Blockers</h4>
                       {detailedReport.issues ? (
                         <p className="text-sm text-red-300 leading-relaxed whitespace-pre-wrap bg-red-950/20 border border-red-900/30 rounded-lg p-3">{detailedReport.issues}</p>
                       ) : (
@@ -433,20 +434,20 @@ export default function MyReportsPage() {
                     </div>
 
                     {/* Remarks */}
-                    <div className="md:col-span-2 bg-white/5 border border-white/10 rounded-xl p-5">
-                      <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">General Remarks</h4>
+                    <div className="md:col-span-2 bg-white/5 border border-white/10 rounded-xl p-4 sm:p-5">
+                      <h4 className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">General Remarks</h4>
                       <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{detailedReport.remarks || 'No remarks logged'}</p>
                     </div>
                   </div>
 
                   {/* Image Gallery */}
                   {detailedReport.photos && detailedReport.photos.length > 0 && (
-                    <div className="border-t border-white/10 pt-6">
-                      <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                    <div className="border-t border-white/10 pt-5 sm:pt-6">
+                      <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                         <span>📷 Site Photos</span>
                         <span className="text-xs font-normal text-slate-400">({detailedReport.photos.length} photos)</span>
                       </h4>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                         {detailedReport.photos.map((photo) => (
                           <div
                             key={photo._id}
@@ -478,7 +479,7 @@ export default function MyReportsPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900">
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-t border-white/10 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900">
               <div className="flex-1 text-left">
                 {detailedReport && (Date.now() - new Date(detailedReport.createdAt).getTime() >= 24 * 60 * 60 * 1000) && (
                   <span className="text-slate-500 text-xs italic block">
@@ -486,19 +487,19 @@ export default function MyReportsPage() {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
                 {detailedReport && (Date.now() - new Date(detailedReport.createdAt).getTime() < 24 * 60 * 60 * 1000) && (
                   <Link
                     id="edit-dpr-btn"
                     to={`/reports/${detailedReport._id}/edit`}
-                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-sm font-medium text-white rounded-xl transition-colors shadow-lg shadow-indigo-500/20"
+                    className="w-full sm:w-auto px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold text-white rounded-xl transition-colors shadow-lg shadow-indigo-500/20 text-center min-h-[44px] flex items-center justify-center"
                   >
                     Edit Report
                   </Link>
                 )}
                 <button
                   onClick={handleCloseDetail}
-                  className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-sm font-medium text-white rounded-xl transition-colors border border-white/10"
+                  className="w-full sm:w-auto px-5 py-3 bg-white/5 hover:bg-white/10 text-sm font-medium text-white rounded-xl transition-colors border border-white/10 min-h-[44px] flex items-center justify-center"
                 >
                   Close
                 </button>
@@ -521,7 +522,8 @@ export default function MyReportsPage() {
           />
           <button
             onClick={() => setZoomImageUrl(null)}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-slate-900/80 border border-white/10 text-white flex items-center justify-center hover:bg-slate-800 transition-colors"
+            className="absolute top-4 right-4 w-11 h-11 rounded-full bg-slate-900/80 border border-white/10 text-white flex items-center justify-center hover:bg-slate-800 transition-colors z-10"
+            aria-label="Close image lightbox"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

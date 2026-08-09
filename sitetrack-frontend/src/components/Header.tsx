@@ -42,15 +42,17 @@ export default function Header() {
     navigate('/login', { replace: true })
   }
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
   const badge = user ? (roleBadge[user.role as UserRole] ?? roleBadge.site_engineer) : null
   const currentPath = location.pathname
 
   return (
-    <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+    <header className="border-b border-white/10 bg-slate-900/95 backdrop-blur sticky top-0 z-40">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Logo and Brand */}
         <div className="flex items-center gap-3">
-          <Link to="/dashboard" className="flex items-center gap-3">
+          <Link to="/dashboard" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
               <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -65,10 +67,54 @@ export default function Header() {
           </Link>
         </div>
 
-        {/* Navigation & Controls — links are role-specific */}
-        <nav className="flex items-center gap-6 text-sm text-slate-400">
+        {/* Status badges header summary (Mobile & Desktop) */}
+        <div className="flex items-center gap-2">
+          {/* Connection Status Badge */}
+          {isOnline ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Online
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+              Offline
+            </span>
+          )}
 
-          {/* ── Site Engineer: My Reports + Submit DPR ── */}
+          {/* Pending Reports Badge */}
+          {pendingCount > 0 && (
+            <span
+              id="pending-reports-badge"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20 animate-pulse"
+              title={`${pendingCount} reports saved locally waiting to sync`}
+            >
+              Pending: {pendingCount}
+            </span>
+          )}
+
+          {/* Mobile menu toggle button */}
+          <button
+            id="mobile-menu-btn"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors focus:outline-none min-w-[44px] min-h-[44px] flex items-center justify-center"
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
+        </div>
+
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex items-center gap-6 text-sm text-slate-400">
+          {/* Site Engineer */}
           {user?.role === 'site_engineer' && (
             <>
               <Link
@@ -86,19 +132,17 @@ export default function Header() {
             </>
           )}
 
-          {/* ── PM: Dashboard ── */}
+          {/* PM */}
           {user?.role === 'pm' && (
-            <>
-              <Link
-                to="/dashboard"
-                className={`transition-colors hover:text-white ${currentPath === '/dashboard' ? 'text-white font-medium' : ''}`}
-              >
-                Dashboard
-              </Link>
-            </>
+            <Link
+              to="/dashboard"
+              className={`transition-colors hover:text-white ${currentPath === '/dashboard' ? 'text-white font-medium' : ''}`}
+            >
+              Dashboard
+            </Link>
           )}
 
-          {/* ── Admin: Dashboard + Projects + Users ── */}
+          {/* Admin */}
           {user?.role === 'admin' && (
             <>
               <Link
@@ -122,32 +166,6 @@ export default function Header() {
             </>
           )}
 
-          {/* Connection Status Badge */}
-          <div className="flex items-center gap-2">
-            {isOnline ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Online
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-                Offline
-              </span>
-            )}
-
-            {/* Pending Reports Badge */}
-            {pendingCount > 0 && (
-              <span
-                id="pending-reports-badge"
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20 animate-pulse"
-                title={`${pendingCount} reports saved locally waiting to sync`}
-              >
-                Pending: {pendingCount}
-              </span>
-            )}
-          </div>
-
           {/* User profile & Logout */}
           {user && (
             <div className="flex items-center gap-3 pl-4 border-l border-white/10">
@@ -163,7 +181,7 @@ export default function Header() {
               <button
                 id="logout-btn"
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 text-slate-400 hover:text-red-400 transition-colors text-sm font-medium cursor-pointer"
+                className="flex items-center gap-1.5 text-slate-400 hover:text-red-400 transition-colors text-sm font-medium cursor-pointer min-h-[36px] px-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -179,6 +197,110 @@ export default function Header() {
           )}
         </nav>
       </div>
+
+      {/* Mobile Drawer Navigation */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-white/10 bg-slate-900 p-4 space-y-3">
+          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <div>
+              <p className="text-white font-medium text-sm">{user?.name}</p>
+              <p className="text-slate-400 text-xs">{user?.email}</p>
+            </div>
+            {badge && (
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${badge.cls}`}>
+                {badge.label}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col space-y-1">
+            {user?.role === 'site_engineer' && (
+              <>
+                <Link
+                  to="/reports"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-3 py-2.5 rounded-lg text-sm font-medium min-h-[44px] flex items-center transition-colors ${
+                    currentPath === '/reports' ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'text-slate-300 hover:bg-white/5'
+                  }`}
+                >
+                  My Reports
+                </Link>
+                <Link
+                  to="/reports/new"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-3 py-2.5 rounded-lg text-sm font-medium min-h-[44px] flex items-center transition-colors ${
+                    currentPath === '/reports/new' ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'text-slate-300 hover:bg-white/5'
+                  }`}
+                >
+                  Submit Daily Progress Report
+                </Link>
+              </>
+            )}
+
+            {user?.role === 'pm' && (
+              <Link
+                to="/dashboard"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`px-3 py-2.5 rounded-lg text-sm font-medium min-h-[44px] flex items-center transition-colors ${
+                  currentPath === '/dashboard' ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'text-slate-300 hover:bg-white/5'
+                }`}
+              >
+                Dashboard
+              </Link>
+            )}
+
+            {user?.role === 'admin' && (
+              <>
+                <Link
+                  to="/dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-3 py-2.5 rounded-lg text-sm font-medium min-h-[44px] flex items-center transition-colors ${
+                    currentPath === '/dashboard' ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'text-slate-300 hover:bg-white/5'
+                  }`}
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/projects"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-3 py-2.5 rounded-lg text-sm font-medium min-h-[44px] flex items-center transition-colors ${
+                    currentPath === '/projects' ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'text-slate-300 hover:bg-white/5'
+                  }`}
+                >
+                  Projects
+                </Link>
+                <Link
+                  to="/users"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-3 py-2.5 rounded-lg text-sm font-medium min-h-[44px] flex items-center transition-colors ${
+                    currentPath === '/users' ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'text-slate-300 hover:bg-white/5'
+                  }`}
+                >
+                  Users
+                </Link>
+              </>
+            )}
+
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false)
+                handleLogout()
+              }}
+              className="w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 min-h-[44px] flex items-center gap-2 transition-colors text-left"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+              Sign out
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   )
 }
