@@ -12,6 +12,7 @@
     "seed:engineer": "tsx src/scripts/seedTestEngineer.ts",
     "seed:pm": "tsx src/scripts/seedPmUser.ts",
     "test:email": "tsx src/scripts/testEmailNotification.ts",
+    "test:audit": "tsx src/scripts/testAuditAndWindow.ts",
     "test:dpr": "tsx src/scripts/testDprApi.ts"
   },
   "keywords": [
