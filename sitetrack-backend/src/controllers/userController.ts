@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express'
-import mongoose from 'mongoose'
+
 import bcrypt from 'bcrypt'
 import { User } from '../models/User'
 import { Project } from '../models/Project'
 import { ProjectAssignment } from '../models/ProjectAssignment'
+import mongoose from 'mongoose'
 import { AppError } from '../middleware/errorHandler'
 
 /** Strip sensitive fields before sending user data */
@@ -86,6 +87,42 @@ export async function listUsers(
       success: true,
       count: users.length,
       data: users,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ── PATCH /api/users/:id/status ─────────────────────────────────────────
+
+export async function toggleUserStatus(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const id = String(req.params.id)
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new AppError('Invalid user ID format', 400)
+    }
+
+    // Prevent admin from deactivating themselves
+    if (id === (req.user! as any).userId) {
+      throw new AppError('You cannot change your own status', 400)
+    }
+
+    const target = await User.findOne({ _id: id, orgId: req.user!.orgId })
+    if (!target) {
+      throw new AppError('User not found in your organization', 404)
+    }
+
+    target.status = target.status === 'active' ? 'inactive' : 'active'
+    await target.save()
+
+    res.status(200).json({
+      success: true,
+      data: sanitizeUser(target),
     })
   } catch (err) {
     next(err)
