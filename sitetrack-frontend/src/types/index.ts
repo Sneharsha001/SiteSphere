@@ -23,22 +23,44 @@ export interface LoginResponse {
   user: AuthUser
 }
 
-// ── Project ───────────────────────────────────────────────────────────────
+// ── Managed users (for UsersPage) ─────────────────────────────────────────
 
-export type ProjectStatus = 'planning' | 'active' | 'on_hold' | 'completed'
-
-export interface Project {
+export interface AppUser {
   _id: string
   name: string
-  description: string
-  status: ProjectStatus
-  progress: number
-  startDate: string
-  endDate?: string
+  email: string
+  role: UserRole
+  status: 'active' | 'inactive'
   orgId: string
   createdAt: string
   updatedAt: string
 }
+
+// ── Project ───────────────────────────────────────────────────────────────
+
+export type BuildingType =
+  | 'residential_house'
+  | 'villa'
+  | 'apartment_residential'
+  | 'college_institutional'
+  | 'commercial_office'
+  | 'other_building'
+
+export type ProjectStatus = 'active' | 'on_hold' | 'completed'
+
+export interface Project {
+  _id: string
+  name: string
+  location?: string
+  buildingType: BuildingType
+  status: ProjectStatus
+  startDate?: string
+  orgId: string
+  createdBy?: string
+  createdAt: string
+  updatedAt: string
+}
+
 
 // ── Daily Progress Report (Dashboard) ─────────────────────────────────────
 

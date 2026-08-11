@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import ProjectsPage from './pages/ProjectsPage'
+import UsersPage from './pages/UsersPage'
 import SubmitReportPage from './pages/SubmitReportPage'
 import MyReportsPage from './pages/MyReportsPage'
 import ReportDetailPage from './pages/ReportDetailPage'
@@ -41,6 +42,18 @@ export default function App() {
                redirectMessage="Project management is restricted to Administrators."
              >
                <ProjectsPage />
+             </ProtectedRoute>
+           }
+         />
+         <Route
+           path="/users"
+           element={
+             <ProtectedRoute
+               roles={['admin']}
+               redirectTo="/dashboard"
+               redirectMessage="User management is restricted to Administrators."
+             >
+               <UsersPage />
              </ProtectedRoute>
            }
          />
