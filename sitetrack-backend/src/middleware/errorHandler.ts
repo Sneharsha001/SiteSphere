@@ -22,9 +22,11 @@ export function notFoundHandler(req: Request, res: Response, next: NextFunction)
 
 // ── Global error handler ──────────────────────────────────────────────────
 
+import { reportError } from '../utils/monitoring'
+
 export function errorHandler(
   err: Error | AppError,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void {
@@ -33,10 +35,11 @@ export function errorHandler(
   const statusCode = isAppError ? err.statusCode : 500
   const message = isAppError ? err.message : 'Internal Server Error'
 
-  // Log stack trace only in development
-  if (process.env.NODE_ENV !== 'production') {
+  // Report 500 errors to monitoring / logging pipeline
+  if (statusCode >= 500 || !isAppError) {
+    reportError(err, statusCode, req)
+  } else if (process.env.NODE_ENV !== 'production') {
     console.error(`[Error] ${statusCode} — ${err.message}`)
-    if (!isAppError) console.error(err.stack)
   }
 
   res.status(statusCode).json({
@@ -46,3 +49,4 @@ export function errorHandler(
     ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
   })
 }
+
