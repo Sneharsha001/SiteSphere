@@ -2,12 +2,15 @@ import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { AppError } from './errorHandler'
 
+import { User } from '../models/User'
+
 // ── JWT payload shape ─────────────────────────────────────────────────────
 
 export interface JwtPayload {
   userId: string
   orgId: string
   role: 'admin' | 'pm' | 'site_engineer'
+  tokenVersion?: number
 }
 
 // ── Extend Express Request to carry decoded user ──────────────────────────
@@ -32,7 +35,7 @@ function extractToken(req: Request): string {
 
 // ── Middleware: authenticateToken ─────────────────────────────────────────
 
-export function authenticateToken(req: Request, _res: Response, next: NextFunction): void {
+export async function authenticateToken(req: Request, _res: Response, next: NextFunction): Promise<void> {
   try {
     const token = extractToken(req)
     const secret = process.env.JWT_SECRET
@@ -41,6 +44,16 @@ export function authenticateToken(req: Request, _res: Response, next: NextFuncti
     }
 
     const decoded = jwt.verify(token, secret) as JwtPayload
+
+    // Validate account status and session token version against DB
+    const user = await User.findById(decoded.userId).select('status tokenVersion')
+    if (!user || user.status === 'inactive') {
+      throw new AppError('Account is deactivated or invalid', 401)
+    }
+    if (decoded.tokenVersion !== undefined && user.tokenVersion !== decoded.tokenVersion) {
+      throw new AppError('Session has expired or was revoked — please log in again', 401)
+    }
+
     req.user = decoded
     next()
   } catch (err) {
@@ -59,6 +72,7 @@ export function authenticateToken(req: Request, _res: Response, next: NextFuncti
     next(err)
   }
 }
+
 
 // ── Middleware: requireRole ───────────────────────────────────────────────
 //

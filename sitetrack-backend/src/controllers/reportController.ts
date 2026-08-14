@@ -10,6 +10,7 @@ import { sendEmail, buildNewDprEmailHtml } from '../utils/email'
 import { User } from '../models/User'
 import { Project } from '../models/Project'
 import { AuditLog } from '../models/AuditLog'
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function parseObjectId(id: string, label: string): mongoose.Types.ObjectId {
@@ -28,7 +29,38 @@ function getStartAndEndOfDay(dateInput: string | Date): { startOfDay: Date; endO
   return { startOfDay, endOfDay }
 }
 
-// getAccessibleProjectIds is imported from '../utils/projectAccess'
+/**
+ * Looks up a DPR and verifies it belongs to the authenticated user's org
+ * by tracing DPR → Project → orgId.
+ *
+ * Returns the report document. Throws 404 if not found or 403 if the project
+ * belongs to a different org.
+ *
+ * Using a generic "not found" message for cross-org IDs prevents information
+ * leakage (an attacker shouldn't learn whether a resource ID exists at all).
+ */
+async function findReportInOrg(
+  reportId: mongoose.Types.ObjectId,
+  orgId: string
+): Promise<InstanceType<typeof DailyProgressReport>> {
+  const report = await DailyProgressReport.findById(reportId)
+  if (!report) {
+    throw new AppError('Daily Progress Report not found', 404)
+  }
+
+  // Verify the project this DPR belongs to is owned by the caller's org
+  const project = await Project.findOne({
+    _id: report.projectId,
+    orgId,
+  }).lean()
+
+  if (!project) {
+    // Return 404 (not 403) to avoid leaking that the resource exists
+    throw new AppError('Daily Progress Report not found', 404)
+  }
+
+  return report
+}
 
 // ── POST /api/reports ─────────────────────────────────────────────────────
 
@@ -38,9 +70,9 @@ export async function createReport(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { role, userId } = req.user!
+    const { role, userId, orgId } = req.user!
 
-    // 1. Role enforcement: Site Engineer only
+    // 1. Role enforcement: Site Engineer only (belt-and-suspenders; route also uses requireRole)
     if (role !== 'site_engineer') {
       throw new AppError('Only Site Engineers are allowed to submit Daily Progress Reports', 403)
     }
@@ -60,7 +92,14 @@ export async function createReport(
 
     const parsedProjectId = parseObjectId(projectId, 'project')
 
-    // 2. Validate project assignment
+    // 2. Verify the project exists AND belongs to the user's org.
+    //    Never trust projectId from the request body without an org check.
+    const project = await Project.findOne({ _id: parsedProjectId, orgId }).lean()
+    if (!project) {
+      throw new AppError('Project not found', 404)
+    }
+
+    // 3. Validate project assignment (engineer must be assigned to this project)
     const assignment = await ProjectAssignment.findOne({
       projectId: parsedProjectId,
       userId: new mongoose.Types.ObjectId(userId),
@@ -70,7 +109,7 @@ export async function createReport(
       throw new AppError('Access denied: You are not assigned to this project', 403)
     }
 
-    // 3. Duplicate check for engineer + project + date
+    // 4. Duplicate check for engineer + project + date
     const reportDate = new Date(date)
     const { startOfDay, endOfDay } = getStartAndEndOfDay(reportDate)
 
@@ -87,7 +126,7 @@ export async function createReport(
       )
     }
 
-    // 4. Create DailyProgressReport document
+    // 5. Create DailyProgressReport document
     const report = await DailyProgressReport.create({
       projectId: parsedProjectId,
       engineerId: new mongoose.Types.ObjectId(userId),
@@ -103,7 +142,7 @@ export async function createReport(
       syncStatus: 'synced',
     })
 
-    // 5. Handle photo uploads via Cloudinary
+    // 6. Handle photo uploads via Cloudinary
     const files = (req.files as Express.Multer.File[]) || []
     const photoDocs = []
 
@@ -117,13 +156,8 @@ export async function createReport(
       photoDocs.push(photoDoc)
     }
 
-    // 6. Send Email Notifications to Project Managers
+    // 7. Send Email Notifications to Project Managers
     try {
-      // ── Strategy: find all users with role 'pm' who are assigned to this project.
-      //   We join ProjectAssignment → User so that any PM assignment (regardless of
-      //   the roleOnProject label) triggers the notification, as long as the user's
-      //   system role is 'pm'. This is more robust than matching on the roleOnProject
-      //   string which varies by how the assignment was created.
       const allAssignments = await ProjectAssignment.find({
         projectId: parsedProjectId,
       })
@@ -135,9 +169,10 @@ export async function createReport(
       } else {
         const assignedUserIds = allAssignments.map((a) => a.userId)
 
-        // Filter to only those with system role 'pm' (active)
+        // Only notify PMs in the same org (belt-and-suspenders)
         const pms = await User.find({
           _id: { $in: assignedUserIds },
+          orgId,
           role: 'pm',
           status: 'active',
         }).lean()
@@ -145,10 +180,9 @@ export async function createReport(
         if (pms.length === 0) {
           console.warn(`⚠️ No active PM found among users assigned to project ${projectId}; skipping email.`)
         } else {
-          const project = await Project.findById(parsedProjectId).lean()
           const engineer = await User.findById(userId).lean()
 
-          const projectName = project?.name || 'Unknown Project'
+          const projectName = project.name || 'Unknown Project'
           const engName = engineer?.name || 'Unknown Engineer'
           const dateStr = reportDate.toISOString().split('T')[0]
           const labourTotal =
@@ -173,15 +207,11 @@ export async function createReport(
           const pmEmails = pms.map((pm) => pm.email)
           console.log(`📧 Sending DPR notification to PM(s): ${pmEmails.join(', ')}`)
 
-          // Awaiting is fine here — sendEmail has its own internal try/catch and
-          // will never throw. Awaiting ensures the Ethereal preview URL is logged
-          // to the console before the process exits in test scenarios.
           await sendEmail(pmEmails, subject, html)
         }
       }
     } catch (emailErr) {
       console.warn('⚠️ Unexpected error during email notification process:', emailErr)
-      // Do NOT throw. Let the DPR creation succeed regardless of email outcome.
     }
 
     res.status(201).json({
@@ -205,14 +235,35 @@ export async function listReports(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { role, userId } = req.user!
+    const { role, userId, orgId } = req.user!
     const filter: Record<string, any> = {}
 
-    // 1. Role-based scoping
+    // 1. Role-based scoping — always org-bounded
     if (role === 'site_engineer') {
+      // Scope to engineer's own reports, but only for projects in their org.
+      // Get all project IDs in this org that this engineer is assigned to.
+      const assignments = await ProjectAssignment.find({
+        userId: new mongoose.Types.ObjectId(userId),
+      })
+        .select('projectId')
+        .lean()
+
+      const assignedProjectIds = assignments.map((a) => a.projectId)
+
+      // Intersect with org-owned projects to enforce org boundary at DB level
+      const orgProjects = await Project.find({
+        _id: { $in: assignedProjectIds },
+        orgId,
+      })
+        .select('_id')
+        .lean()
+
+      const orgProjectIds = orgProjects.map((p) => p._id)
+
       filter.engineerId = new mongoose.Types.ObjectId(userId)
+      filter.projectId = { $in: orgProjectIds }
     } else {
-      // PM or Admin: scope to accessible projects
+      // PM or Admin: scope to accessible projects (org-bounded in getAccessibleProjectIds)
       const accessibleProjectIds = await getAccessibleProjectIds(req)
       filter.projectId = { $in: accessibleProjectIds }
     }
@@ -220,7 +271,14 @@ export async function listReports(
     // 2. Query param filtering: ?projectId=
     if (req.query.projectId) {
       const qProjectId = parseObjectId(String(req.query.projectId), 'project')
-      if (role !== 'site_engineer') {
+      if (role === 'site_engineer') {
+        // Verify the requested project is in the filter's allowed set
+        const allowed = (filter.projectId as { $in: mongoose.Types.ObjectId[] }).$in
+        const isAccessible = allowed.some((id) => id.equals(qProjectId))
+        if (!isAccessible) {
+          throw new AppError('You do not have access to this project', 403)
+        }
+      } else {
         const accessibleIds = await getAccessibleProjectIds(req)
         const isAccessible = accessibleIds.some((id) => id.equals(qProjectId))
         if (!isAccessible) {
@@ -247,7 +305,6 @@ export async function listReports(
     const reportIds = reports.map((r) => r._id)
     const photos = await ReportPhoto.find({ reportId: { $in: reportIds } }).lean()
 
-    // Map photos to their corresponding report
     const photosByReportId: Record<string, any[]> = {}
     photos.forEach((photo) => {
       const key = photo.reportId.toString()
@@ -279,10 +336,11 @@ export async function getReport(
 ): Promise<void> {
   try {
     const reportId = parseObjectId(req.params.id as string, 'report')
-    const { role, userId } = req.user!
+    const { role, userId, orgId } = req.user!
 
+    // findReportInOrg: verifies DPR exists and DPR→project→orgId matches caller
     const report = await DailyProgressReport.findById(reportId)
-      .populate('projectId', 'name buildingType location orgId')
+      .populate<{ projectId: { _id: mongoose.Types.ObjectId; name: string; buildingType?: string; location?: string; orgId: mongoose.Types.ObjectId } }>('projectId', 'name buildingType location orgId')
       .populate('engineerId', 'name email')
       .lean()
 
@@ -290,13 +348,22 @@ export async function getReport(
       throw new AppError('Daily Progress Report not found', 404)
     }
 
-    // Access control check
+    // Org isolation check — applies to ALL roles
+    const projectOrgId = (report.projectId as any)?.orgId?.toString()
+    if (projectOrgId !== orgId) {
+      // Return 404 to avoid leaking that the resource exists in another org
+      throw new AppError('Daily Progress Report not found', 404)
+    }
+
+    // Role-specific access control (beyond org boundary)
     if (role === 'site_engineer') {
+      // Engineers can only read their own reports
       const engineerObjId = (report.engineerId as any)?._id || report.engineerId
       if (!engineerObjId.equals(new mongoose.Types.ObjectId(userId))) {
         throw new AppError('Access denied: You can only view your own progress reports', 403)
       }
     } else {
+      // PM or Admin: verify the project is within their accessible scope
       const accessibleProjectIds = await getAccessibleProjectIds(req)
       const projectObjId = (report.projectId as any)?._id || report.projectId
       const hasAccess = accessibleProjectIds.some((id) => id.equals(projectObjId))
@@ -319,6 +386,7 @@ export async function getReport(
     next(err)
   }
 }
+
 // ── PATCH /api/reports/:id (Site Engineer Edit) ───────────────────────────
 
 export async function updateReport(
@@ -328,27 +396,30 @@ export async function updateReport(
 ): Promise<void> {
   try {
     const reportId = parseObjectId(req.params.id as string, 'report')
-    const { role, userId } = req.user!
+    const { role, userId, orgId } = req.user!
 
     if (role !== 'site_engineer') {
       throw new AppError('Only Site Engineers can use this endpoint', 403)
     }
 
-    const report = await DailyProgressReport.findById(reportId)
-    if (!report) {
-      throw new AppError('Daily Progress Report not found', 404)
-    }
+    // findReportInOrg: fetches report and verifies it belongs to caller's org
+    const report = await findReportInOrg(reportId, orgId)
 
+    // Engineer can only edit their own reports
     if (!report.engineerId.equals(new mongoose.Types.ObjectId(userId))) {
       throw new AppError('Access denied: You can only edit your own progress reports', 403)
     }
 
+    // 24-hour edit window
     const now = Date.now()
     const createdAtMs = report.createdAt.getTime()
-    const windowMs = 24 * 60 * 60 * 1000 // 24 hours
+    const windowMs = 24 * 60 * 60 * 1000
 
     if (now - createdAtMs > windowMs) {
-      throw new AppError('This report is older than 24 hours and cannot be edited directly. Contact an Admin to request a change.', 403)
+      throw new AppError(
+        'This report is older than 24 hours and cannot be edited directly. Contact an Admin to request a change.',
+        403
+      )
     }
 
     const {
@@ -367,7 +438,7 @@ export async function updateReport(
 
     const fieldsToUpdate = [
       'workDone', 'quantity', 'labourSkilled', 'labourUnskilled',
-      'labourOperators', 'tomorrowPlan', 'issues', 'remarks'
+      'labourOperators', 'tomorrowPlan', 'issues', 'remarks',
     ]
 
     for (const field of fieldsToUpdate) {
@@ -389,10 +460,12 @@ export async function updateReport(
     const photoDocs = []
 
     if (files.length > 0) {
-      // Fetch count of existing photos for this report
       const existingPhotosCount = await ReportPhoto.countDocuments({ reportId: report._id })
       if (existingPhotosCount + files.length > 5) {
-        throw new AppError(`Upload limit exceeded: A report can have at most 5 photos. (Already has ${existingPhotosCount})`, 400)
+        throw new AppError(
+          `Upload limit exceeded: A report can have at most 5 photos. (Already has ${existingPhotosCount})`,
+          400
+        )
       }
 
       for (const file of files) {
@@ -404,7 +477,7 @@ export async function updateReport(
         })
         photoDocs.push(photoDoc)
       }
-      changes.photos = { added: photoDocs.map(p => p.fileUrl) }
+      changes.photos = { added: photoDocs.map((p) => p.fileUrl) }
     }
 
     if (Object.keys(changes).length === 0) {
@@ -439,7 +512,7 @@ export async function updateReport(
   }
 }
 
-// ── PATCH /api/reports/:id/admin-edit ──────────────────────────────────────
+// ── PATCH /api/reports/:id/admin-edit ─────────────────────────────────────
 
 export async function adminUpdateReport(
   req: Request,
@@ -448,12 +521,11 @@ export async function adminUpdateReport(
 ): Promise<void> {
   try {
     const reportId = parseObjectId(req.params.id as string, 'report')
-    const { userId } = req.user! // requireRole('admin') handles role check
+    const { userId, orgId } = req.user! // requireRole('admin') handles role check in router
 
-    const report = await DailyProgressReport.findById(reportId)
-    if (!report) {
-      throw new AppError('Daily Progress Report not found', 404)
-    }
+    // findReportInOrg: fetches report and verifies it belongs to admin's org.
+    // Without this, an admin from Org A could admin-edit a DPR from Org B.
+    const report = await findReportInOrg(reportId, orgId)
 
     const {
       workDone,
@@ -471,7 +543,7 @@ export async function adminUpdateReport(
 
     const fieldsToUpdate = [
       'workDone', 'quantity', 'labourSkilled', 'labourUnskilled',
-      'labourOperators', 'tomorrowPlan', 'issues', 'remarks'
+      'labourOperators', 'tomorrowPlan', 'issues', 'remarks',
     ]
 
     for (const field of fieldsToUpdate) {
@@ -493,10 +565,12 @@ export async function adminUpdateReport(
     const photoDocs = []
 
     if (files.length > 0) {
-      // Fetch count of existing photos for this report
       const existingPhotosCount = await ReportPhoto.countDocuments({ reportId: report._id })
       if (existingPhotosCount + files.length > 5) {
-        throw new AppError(`Upload limit exceeded: A report can have at most 5 photos. (Already has ${existingPhotosCount})`, 400)
+        throw new AppError(
+          `Upload limit exceeded: A report can have at most 5 photos. (Already has ${existingPhotosCount})`,
+          400
+        )
       }
 
       for (const file of files) {
@@ -508,7 +582,7 @@ export async function adminUpdateReport(
         })
         photoDocs.push(photoDoc)
       }
-      changes.photos = { added: photoDocs.map(p => p.fileUrl) }
+      changes.photos = { added: photoDocs.map((p) => p.fileUrl) }
     }
 
     if (Object.keys(changes).length === 0) {
@@ -552,12 +626,11 @@ export async function getReportAudit(
 ): Promise<void> {
   try {
     const reportId = parseObjectId(req.params.id as string, 'report')
-    
-    // Check if report exists
-    const report = await DailyProgressReport.findById(reportId).lean()
-    if (!report) {
-      throw new AppError('Daily Progress Report not found', 404)
-    }
+    const { orgId } = req.user! // requireRole('admin') handles role check in router
+
+    // Verify report exists and belongs to admin's org before returning audit data.
+    // Without this, an admin from Org A could read audit logs for Org B's DPRs.
+    await findReportInOrg(reportId, orgId)
 
     const auditLogs = await AuditLog.find({
       entity: 'DailyProgressReport',

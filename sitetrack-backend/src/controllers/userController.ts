@@ -6,6 +6,7 @@ import { Project } from '../models/Project'
 import { ProjectAssignment } from '../models/ProjectAssignment'
 import mongoose from 'mongoose'
 import { AppError } from '../middleware/errorHandler'
+import { validatePasswordStrength } from '../utils/passwordValidation'
 
 /** Strip sensitive fields before sending user data */
 function sanitizeUser(user: any) {
@@ -45,6 +46,11 @@ export async function createUser(
       throw new AppError(`Invalid role. Allowed roles: ${allowedRoles.join(', ')}`, 400)
     }
 
+    const passCheck = validatePasswordStrength(password)
+    if (!passCheck.isValid) {
+      throw new AppError(passCheck.error || 'Password does not meet complexity requirements', 400)
+    }
+
     const existingUser = await User.findOne({ email: email.toLowerCase().trim() })
     if (existingUser) {
       throw new AppError('A user with this email already exists', 400)
@@ -79,7 +85,11 @@ export async function listUsers(
 ): Promise<void> {
   try {
     const users = await User.find({ orgId: req.user!.orgId })
-      .select('-passwordHash -resetPasswordToken -resetPasswordExpires')
+      .select(
+        '-passwordHash -resetPasswordToken -resetPasswordExpires ' +
+        '-refreshTokenHash -emailVerificationToken -emailVerificationExpires ' +
+        '-tokenVersion'
+      )
       .sort({ createdAt: -1 })
       .lean()
 

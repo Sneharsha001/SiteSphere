@@ -251,8 +251,82 @@ export async function sendEmail(
 
     return true
   } catch (error) {
-    // Intentionally swallowed — email failure must never block a DPR save.
+    // Intentionally swallowed — email failure must never block a request.
     console.warn(`⚠️  Failed to send email to ${to}:`, error)
     return false
   }
+}
+
+/**
+ * Builds HTML for Password Reset Email.
+ */
+export function buildPasswordResetEmailHtml(opts: { userName: string; resetLink: string }): string {
+  const { userName, resetLink } = opts
+  return `
+    <p style="margin:0 0 16px;font-size:15px;color:#94a3b8;line-height:1.6;">
+      Hello <strong style="color:#f1f5f9;">${userName}</strong>,
+    </p>
+    <p style="margin:0 0 24px;font-size:14px;color:#cbd5e1;line-height:1.6;">
+      You requested a password reset for your SiteTrack account. Click the button below to reset your password. This link will expire in 1 hour.
+    </p>
+    <div style="margin:28px 0;text-align:center;">
+      <a href="${resetLink}"
+         style="display:inline-block;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:600;letter-spacing:0.5px;">
+        Reset Password →
+      </a>
+    </div>
+    <p style="margin:20px 0 0;font-size:12px;color:#64748b;line-height:1.5;">
+      If you did not request a password reset, you can safely ignore this email. Your password will remain unchanged.
+    </p>
+  `
+}
+
+/**
+ * Sends a password reset email to the given recipient.
+ */
+export async function sendPasswordResetEmail(to: string, userName: string, resetLink: string): Promise<boolean> {
+  return sendEmail(
+    to,
+    'SiteTrack — Password Reset Request',
+    buildPasswordResetEmailHtml({ userName, resetLink })
+  )
+}
+
+/**
+ * Builds HTML for an email verification email.
+ */
+export function buildVerificationEmailHtml(opts: { userName: string; verificationLink: string }): string {
+  const { userName, verificationLink } = opts
+  return `
+    <p style="margin:0 0 16px;font-size:15px;color:#94a3b8;line-height:1.6;">
+      Hello <strong style="color:#f1f5f9;">${userName}</strong>,
+    </p>
+    <p style="margin:0 0 24px;font-size:14px;color:#cbd5e1;line-height:1.6;">
+      Thanks for signing up for SiteTrack! Please verify your email address by clicking the button below. This link will expire in 24 hours.
+    </p>
+    <div style="margin:28px 0;text-align:center;">
+      <a href="${verificationLink}"
+         style="display:inline-block;background:linear-gradient(135deg,#059669,#10b981);color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:600;letter-spacing:0.5px;">
+        Verify Email &rarr;
+      </a>
+    </div>
+    <p style="margin:20px 0 0;font-size:12px;color:#64748b;line-height:1.5;">
+      If you did not create a SiteTrack account, you can safely ignore this email.
+    </p>
+  `
+}
+
+/**
+ * Sends an email verification email to the newly registered user.
+ */
+export async function sendVerificationEmail(
+  to: string,
+  userName: string,
+  verificationLink: string
+): Promise<boolean> {
+  return sendEmail(
+    to,
+    'SiteTrack — Verify Your Email Address',
+    buildVerificationEmailHtml({ userName, verificationLink })
+  )
 }

@@ -9,6 +9,11 @@ export interface IUser extends Document {
   status: 'active' | 'inactive'
   resetPasswordToken?: string   // hashed token stored in DB
   resetPasswordExpires?: Date   // expiry timestamp
+  refreshTokenHash?: string     // hashed refresh token
+  tokenVersion: number          // session invalidation version
+  isEmailVerified: boolean
+  emailVerificationToken?: string
+  emailVerificationExpires?: Date
 }
 
 const userSchema = new Schema<IUser>(
@@ -52,6 +57,26 @@ const userSchema = new Schema<IUser>(
       type: Date,
       default: undefined,
     },
+    refreshTokenHash: {
+      type: String,
+      default: undefined,
+    },
+    tokenVersion: {
+      type: Number,
+      default: 0,
+    },
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerificationToken: {
+      type: String,
+      default: undefined,
+    },
+    emailVerificationExpires: {
+      type: Date,
+      default: undefined,
+    },
   },
   {
     timestamps: true,
@@ -59,5 +84,8 @@ const userSchema = new Schema<IUser>(
 )
 
 userSchema.index({ orgId: 1 })
+userSchema.index({ resetPasswordToken: 1 }, { sparse: true })
+userSchema.index({ emailVerificationToken: 1 }, { sparse: true })
 
 export const User = mongoose.model<IUser>('User', userSchema)
+

@@ -310,7 +310,7 @@ export default function UsersPage() {
             {/* User rows */}
             {users.map((u) => {
               const role = roleConfig[u.role] ?? roleConfig.site_engineer
-              const isSelf = u._id === currentUser?._id
+              const isSelf = u._id === currentUser?.id
               const isToggling = togglingId === u._id
 
               return (

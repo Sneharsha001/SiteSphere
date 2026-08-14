@@ -1,42 +1,28 @@
 import axios from 'axios'
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'https://sitetrack-hqw3.onrender.com/api'
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api'
 
 /**
  * Pre-configured Axios instance wired to the SiteTrack backend.
- * Token is attached automatically via request interceptor.
- * 401 responses auto-redirect to /login.
+ * Configured with withCredentials for HttpOnly refresh cookies.
+ * Token attached via request interceptor.
+ * Auto-refreshes token on 401 response.
  */
 export const api = axios.create({
   baseURL: BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
-// ── In-memory token (the authoritative reference) ─────────────────────────
-// We keep the token in memory so it isn't accessible to XSS scripts that
-// only read localStorage. localStorage is used only for persistence across
-// page refreshes.
-
 let inMemoryToken: string | null = null
 
 export function setToken(token: string | null): void {
   inMemoryToken = token
-  if (token) {
-    localStorage.setItem('sitetrack_token', token)
-  } else {
-    localStorage.removeItem('sitetrack_token')
-  }
 }
 
 export function getToken(): string | null {
-  if (inMemoryToken) return inMemoryToken
-  // Restore from localStorage on page reload
-  const stored = localStorage.getItem('sitetrack_token')
-  if (stored) {
-    inMemoryToken = stored
-  }
   return inMemoryToken
 }
 
@@ -49,15 +35,70 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// ── Response interceptor: handle 401 ─────────────────────────────────────
+// ── Response interceptor: handle 401 & auto-refresh ──────────────────────
+let isRefreshing = false
+let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: any) => void }> = []
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error)
+    } else {
+      prom.resolve(token!)
+    }
+  })
+  failedQueue = []
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      setToken(null)
-      // Navigate to login — AuthContext will handle the React redirect
-      window.location.href = '/login'
+  async (error) => {
+    const originalRequest = error.config
+
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/auth/login') &&
+      !originalRequest.url?.includes('/auth/refresh')
+    ) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`
+            return api(originalRequest)
+          })
+          .catch((err) => Promise.reject(err))
+      }
+
+      originalRequest._retry = true
+      isRefreshing = true
+
+      try {
+        const refreshRes = await axios.post(
+          `${BASE_URL}/auth/refresh`,
+          {},
+          { withCredentials: true }
+        )
+        const newAccessToken = refreshRes.data.token
+        setToken(newAccessToken)
+        api.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+        processQueue(null, newAccessToken)
+        return api(originalRequest)
+      } catch (refreshErr) {
+        processQueue(refreshErr, null)
+        setToken(null)
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
+        return Promise.reject(refreshErr)
+      } finally {
+        isRefreshing = false
+      }
     }
+
     return Promise.reject(error)
   }
 )

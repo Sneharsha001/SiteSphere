@@ -1,10 +1,16 @@
-import { CorsOptions } from 'cors'
-
 /**
- * CORS options that allow requests from the FRONTEND_URL env variable.
- * Supports multiple origins via comma-separated values.
- * Falls back to localhost + production Render frontend.
+ * src/config/cors.ts
+ *
+ * CORS configuration.
+ *
+ * In development: allows any localhost origin (any port) for convenience.
+ * In production:  only origins in the ALWAYS_ALLOWED list or FRONTEND_URL env var.
+ *
+ * The 'credentials: true' flag is required for HttpOnly cookies to be
+ * sent/received cross-origin by the browser.
  */
+
+import { CorsOptions } from 'cors'
 
 const ALWAYS_ALLOWED = [
   'http://localhost:5173',
@@ -21,18 +27,25 @@ function getAllowedOrigins(): string[] {
   return [...new Set([...ALWAYS_ALLOWED, ...envOrigins])]
 }
 
+const isDevelopment = process.env.NODE_ENV !== 'production'
+
 export const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (curl, Postman, server-to-server)
+    // Allow requests with no origin (curl, Postman, server-to-server health checks)
     if (!origin) {
       return callback(null, true)
     }
 
     const allowed = getAllowedOrigins()
-    if (
+
+    // In development only: allow any localhost port for hot-reload convenience.
+    // In production this regex is intentionally disabled to prevent subdomain
+    // or port-squatting attacks.
+    const isAllowedOrigin =
       allowed.includes(origin) ||
-      /^https?:\/\/localhost(:\d+)?$/.test(origin)
-    ) {
+      (isDevelopment && /^https?:\/\/localhost(:\d+)?$/.test(origin))
+
+    if (isAllowedOrigin) {
       callback(null, true)
     } else {
       callback(new Error(`CORS: origin '${origin}' is not allowed`))

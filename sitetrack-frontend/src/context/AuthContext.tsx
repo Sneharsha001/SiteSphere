@@ -6,83 +6,92 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
-import { api, setToken, getToken } from '../lib/api'
+import { api, setToken } from '../lib/api'
 import type { AuthUser, LoginCredentials, LoginResponse } from '../types'
 
-// ── Context shape ─────────────────────────────────────────────────────────
+// ── Context shape ──────────────────────────────────────────────────────────
 
 interface AuthContextValue {
-  /** Currently logged-in user, or null if not authenticated */
   user: AuthUser | null
-  /** Raw JWT string, or null */
   token: string | null
-  /** True while restoring session or during login */
   isLoading: boolean
-  /** Attempt login — throws on failure so the form can show the error */
   login: (credentials: LoginCredentials) => Promise<void>
-  /** Clear session and token */
-  logout: () => void
+  logout: () => Promise<void>
+  refreshSession: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-// ── Provider ──────────────────────────────────────────────────────────────
+// ── Provider ───────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [token, setTokenState] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true) // true on mount while we restore
+  const [isLoading, setIsLoading] = useState(true)
 
-  // ── Restore session from localStorage on first mount ─────────────────
-  useEffect(() => {
-    const storedToken = getToken()
-    const storedUser = localStorage.getItem('sitetrack_user')
-
-    if (storedToken && storedUser) {
-      try {
-        const parsed: AuthUser = JSON.parse(storedUser)
-        setTokenState(storedToken)
-        setUser(parsed)
-        setToken(storedToken) // sync into in-memory slot
-      } catch {
-        // Malformed storage — clear everything
-        setToken(null)
-        localStorage.removeItem('sitetrack_user')
-      }
+  /**
+   * Attempt to restore a session by calling /auth/refresh.
+   * The HttpOnly cookie is sent automatically by the browser.
+   * Returns true if a valid session was restored.
+   */
+  const refreshSession = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await api.post<LoginResponse>('/auth/refresh')
+      const { token: jwt, user: refreshedUser } = res.data
+      setToken(jwt)
+      setTokenState(jwt)
+      setUser(refreshedUser)
+      return true
+    } catch {
+      setToken(null)
+      setTokenState(null)
+      setUser(null)
+      return false
     }
-    setIsLoading(false)
   }, [])
 
-  // ── Login ─────────────────────────────────────────────────────────────
+  // Restore session on app mount via HttpOnly cookie → /auth/refresh
+  useEffect(() => {
+    refreshSession().finally(() => setIsLoading(false))
+  }, [refreshSession])
+
+  /**
+   * Login: call POST /auth/login, store access token in memory.
+   * Refresh token is set as HttpOnly cookie by the server.
+   */
   const login = useCallback(async (credentials: LoginCredentials): Promise<void> => {
     const response = await api.post<LoginResponse>('/auth/login', credentials)
     const { token: jwt, user: loggedInUser } = response.data
 
-    // Persist
     setToken(jwt)
-    localStorage.setItem('sitetrack_user', JSON.stringify(loggedInUser))
-
-    // Update state
     setTokenState(jwt)
     setUser(loggedInUser)
   }, [])
 
-  // ── Logout ────────────────────────────────────────────────────────────
-  const logout = useCallback(() => {
-    setToken(null)
-    localStorage.removeItem('sitetrack_user')
-    setTokenState(null)
-    setUser(null)
+  /**
+   * Logout: tell the server to revoke the refresh token cookie, then
+   * clear all in-memory auth state.
+   */
+  const logout = useCallback(async (): Promise<void> => {
+    try {
+      await api.post('/auth/logout')
+    } catch {
+      // Continue even if the server call fails
+    } finally {
+      setToken(null)
+      setTokenState(null)
+      setUser(null)
+    }
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout, refreshSession }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
-// ── useAuth hook ──────────────────────────────────────────────────────────
+// ── Hook ───────────────────────────────────────────────────────────────────
 
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext)

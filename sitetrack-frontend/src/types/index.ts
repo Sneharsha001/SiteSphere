@@ -3,12 +3,14 @@
 export type UserRole = 'admin' | 'pm' | 'site_engineer'
 
 export interface AuthUser {
-  _id: string
+  /** Mongo _id string returned by sanitizeUser as 'id' */
+  id: string
   name: string
   email: string
   role: UserRole
   status: 'active' | 'inactive'
   orgId: string
+  isEmailVerified: boolean
 }
 
 export interface LoginCredentials {
@@ -16,7 +18,10 @@ export interface LoginCredentials {
   password: string
 }
 
-/** Shape returned by POST /api/auth/login */
+/**
+ * Shape returned by POST /api/auth/login,
+ * POST /api/auth/refresh, and GET /api/auth/me.
+ */
 export interface LoginResponse {
   success: boolean
   token: string

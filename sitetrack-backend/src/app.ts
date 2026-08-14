@@ -1,5 +1,7 @@
 import express, { Application } from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import cookieParser from 'cookie-parser'
 import { corsOptions } from './config/cors'
 import { requestLogger } from './middleware/requestLogger'
 import { notFoundHandler, errorHandler } from './middleware/errorHandler'
@@ -7,6 +9,10 @@ import healthRoutes from './routes/healthRoutes'
 import apiRoutes from './routes'
 
 const app: Application = express()
+
+// ── Security Headers & Cookies ───────────────────────────────────────────
+app.use(helmet())
+app.use(cookieParser())
 
 // ── Core middleware ───────────────────────────────────────────────────────
 app.use(cors(corsOptions))

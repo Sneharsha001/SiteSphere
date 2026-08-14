@@ -2,6 +2,10 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
+import ResendVerificationPage from './pages/ResendVerificationPage'
 import DashboardPage from './pages/DashboardPage'
 import ProjectsPage from './pages/ProjectsPage'
 import UsersPage from './pages/UsersPage'
@@ -17,8 +21,12 @@ export default function App() {
         {/* Public redirect */}
         <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {/* Public route — login page */}
+        {/* Public routes — authentication */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/resend-verification" element={<ResendVerificationPage />} />
 
         {/* Protected routes — require authentication */}
         <Route
