@@ -15,7 +15,7 @@ import { CorsOptions } from 'cors'
 const ALWAYS_ALLOWED = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://sitesphere-cbch.onrender.com', // production frontend
+  'https://sitesphere-cbch.onrender.com', // default onrender frontend
 ]
 
 function getAllowedOrigins(): string[] {
@@ -38,12 +38,10 @@ export const corsOptions: CorsOptions = {
 
     const allowed = getAllowedOrigins()
 
-    // In development only: allow any localhost port for hot-reload convenience.
-    // In production this regex is intentionally disabled to prevent subdomain
-    // or port-squatting attacks.
     const isAllowedOrigin =
       allowed.includes(origin) ||
-      (isDevelopment && /^https?:\/\/localhost(:\d+)?$/.test(origin))
+      (isDevelopment && /^https?:\/\/localhost(:\d+)?$/.test(origin)) ||
+      /^https:\/\/(.*\.)?sitesphere\.(com|dev|app|io)$/.test(origin)
 
     if (isAllowedOrigin) {
       callback(null, true)
@@ -51,6 +49,7 @@ export const corsOptions: CorsOptions = {
       callback(new Error(`CORS: origin '${origin}' is not allowed`))
     }
   },
+
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
