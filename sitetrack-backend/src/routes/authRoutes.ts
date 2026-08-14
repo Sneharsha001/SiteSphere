@@ -18,6 +18,7 @@ import rateLimit from 'express-rate-limit'
 import {
   register,
   login,
+  verifyEmail,
   refresh,
   logout,
   getMe,
@@ -62,8 +63,12 @@ const refreshLimiter = rateLimit({
 // POST /api/auth/register — public self-registration (creates org + admin user)
 router.post('/register', authLimiter, register)
 
+// POST /api/auth/verify-email — verify user email address
+router.post('/verify-email', authLimiter, verifyEmail)
+
 // POST /api/auth/login
 router.post('/login', authLimiter, login)
+
 
 // POST /api/auth/refresh — uses HttpOnly cookie; no body required
 router.post('/refresh', refreshLimiter, refresh)

@@ -384,8 +384,10 @@ describe('Organization Isolation', () => {
       passwordHash: hashB,
       role: 'admin',
       status: 'active',
+      isEmailVerified: true,
       tokenVersion: 0,
     })
+
     const loginB = await loginAs('admin@orgb.com')
     const tokenB = loginB.body.token
 
@@ -492,3 +494,70 @@ describe('Forgot + Reset Password', () => {
     expect(res.body.success).toBe(false)
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Account Lockout & Email Verification
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Account Lockout after 5 failed attempts', () => {
+  let seed: SeedResult
+  beforeEach(async () => {
+    seed = await seedAll()
+  })
+
+  it('locks account on 5th consecutive failed login attempt and blocks 6th attempt', async () => {
+    // 4 failed attempts
+    for (let i = 1; i <= 4; i++) {
+      const res = await loginAs(seed.engineerEmail, 'WrongPass1!')
+      expect(res.status).toBe(401)
+    }
+
+    // 5th failed attempt -> 423 Locked
+    const lockRes = await loginAs(seed.engineerEmail, 'WrongPass1!')
+    expect(lockRes.status).toBe(423)
+    expect(lockRes.body.message).toMatch(/locked/i)
+
+    // 6th attempt (even with CORRECT password) -> blocked with 423
+    const lockedRes = await loginAs(seed.engineerEmail, 'Password1!')
+    expect(lockedRes.status).toBe(423)
+    expect(lockedRes.body.message).toMatch(/locked/i)
+  })
+})
+
+describe('Email Verification', () => {
+  it('blocks login for unverified user and allows login after verification', async () => {
+    const seed = await seedAll()
+
+    // Create an unverified user
+    const createRes = await request
+      .post('/api/users')
+      .set('Authorization', `Bearer ${seed.adminToken}`)
+      .send({
+        name: 'Unverified Engineer',
+        email: 'unverified@test.com',
+        password: 'Password1!',
+        role: 'site_engineer',
+      })
+
+    expect(createRes.status).toBe(201)
+    const verificationToken = createRes.body.verificationToken
+
+    // Try logging in before verifying -> 403 Forbidden
+    const loginFail = await loginAs('unverified@test.com', 'Password1!')
+    expect(loginFail.status).toBe(403)
+    expect(loginFail.body.message).toMatch(/not verified/i)
+
+    // Verify email via token
+    const verifyRes = await request
+      .post('/api/auth/verify-email')
+      .send({ token: verificationToken })
+
+    expect(verifyRes.status).toBe(200)
+
+    // Login after verification -> 200 OK
+    const loginOk = await loginAs('unverified@test.com', 'Password1!')
+    expect(loginOk.status).toBe(200)
+    expect(loginOk.body.token).toBeDefined()
+  })
+})
+

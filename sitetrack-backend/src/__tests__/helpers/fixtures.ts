@@ -61,10 +61,11 @@ export async function seedAll(): Promise<SeedResult> {
   const hash = await bcrypt.hash(password, 10)
 
   const [admin, pm, engineer] = await User.insertMany([
-    { orgId, name: 'Admin User', email: adminEmail, passwordHash: hash, role: 'admin', status: 'active', tokenVersion: 0 },
-    { orgId, name: 'PM User',    email: pmEmail,    passwordHash: hash, role: 'pm',    status: 'active', tokenVersion: 0 },
-    { orgId, name: 'Engineer User', email: engineerEmail, passwordHash: hash, role: 'site_engineer', status: 'active', tokenVersion: 0 },
+    { orgId, name: 'Admin User', email: adminEmail, passwordHash: hash, role: 'admin', status: 'active', isEmailVerified: true, tokenVersion: 0 },
+    { orgId, name: 'PM User',    email: pmEmail,    passwordHash: hash, role: 'pm',    status: 'active', isEmailVerified: true, tokenVersion: 0 },
+    { orgId, name: 'Engineer User', email: engineerEmail, passwordHash: hash, role: 'site_engineer', status: 'active', isEmailVerified: true, tokenVersion: 0 },
   ])
+
 
   const adminId    = (admin._id as any).toString()
   const pmId       = (pm._id as any).toString()

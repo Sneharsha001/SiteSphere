@@ -14,6 +14,8 @@ export interface IUser extends Document {
   isEmailVerified: boolean
   emailVerificationToken?: string
   emailVerificationExpires?: Date
+  failedLoginAttempts: number
+  lockUntil?: Date
 }
 
 const userSchema = new Schema<IUser>(
@@ -77,7 +79,16 @@ const userSchema = new Schema<IUser>(
       type: Date,
       default: undefined,
     },
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lockUntil: {
+      type: Date,
+      default: undefined,
+    },
   },
+
   {
     timestamps: true,
   }

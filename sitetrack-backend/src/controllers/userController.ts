@@ -8,6 +8,9 @@ import mongoose from 'mongoose'
 import { AppError } from '../middleware/errorHandler'
 import { validatePasswordStrength } from '../utils/passwordValidation'
 
+import crypto from 'crypto'
+import { sendVerificationEmail } from '../utils/email'
+
 /** Strip sensitive fields before sending user data */
 function sanitizeUser(user: any) {
   return {
@@ -17,6 +20,7 @@ function sanitizeUser(user: any) {
     email: user.email,
     role: user.role,
     status: user.status,
+    isEmailVerified: user.isEmailVerified,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   }
@@ -58,6 +62,11 @@ export async function createUser(
 
     const passwordHash = await bcrypt.hash(password, 12)
 
+    // Generate email verification token
+    const rawVerificationToken = crypto.randomBytes(32).toString('hex')
+    const hashedVerificationToken = crypto.createHash('sha256').update(rawVerificationToken).digest('hex')
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h
+
     const user = await User.create({
       orgId: req.user!.orgId,
       name: name.trim(),
@@ -65,16 +74,26 @@ export async function createUser(
       passwordHash,
       role,
       status: 'active',
+      isEmailVerified: false,
+      emailVerificationToken: hashedVerificationToken,
+      emailVerificationExpires: verificationExpires,
     })
+
+    // Send verification email (non-blocking)
+    const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${rawVerificationToken}`
+    sendVerificationEmail(user.email, user.name, verificationLink).catch(() => {})
 
     res.status(201).json({
       success: true,
       data: sanitizeUser(user),
+      verificationToken: process.env.NODE_ENV === 'test' ? rawVerificationToken : undefined,
+      message: 'User created successfully. Verification email sent.',
     })
   } catch (err) {
     next(err)
   }
 }
+
 
 // ── GET /api/users ────────────────────────────────────────────────────────
 

@@ -206,49 +206,89 @@ export async function login(
     // 1. Zod validation
     const parsed = LoginSchema.safeParse(req.body)
     if (!parsed.success) {
-      // Generic message to prevent field-level enumeration
       throw new AppError('Invalid email or password', 401)
     }
     const { email, password } = parsed.data
 
-    // 2. Lookup user — select passwordHash explicitly (not returned by default queries)
-    const user = await User.findOne({ email }).select('+passwordHash')
+    // 2. Lookup user — select passwordHash, failedLoginAttempts, lockUntil explicitly
+    const user = await User.findOne({ email }).select('+passwordHash +failedLoginAttempts +lockUntil')
     if (!user) {
       throw new AppError('Invalid email or password', 401)
     }
 
-    // 3. Inactive check — 403 so the client knows it's an account issue, not credentials
+    // 3. Account Lockout check — 5 failed attempts locks for 15 minutes
+    if (user.lockUntil && user.lockUntil > new Date()) {
+      const remainingMs = user.lockUntil.getTime() - Date.now()
+      const remainingMins = Math.ceil(remainingMs / 60000)
+      throw new AppError(
+        `Account is temporarily locked due to repeated failed login attempts. Please try again after ${user.lockUntil.toISOString()} (in ${remainingMins} minute(s)).`,
+        423
+      )
+    }
+
+    // Reset expired lock if present
+    if (user.lockUntil && user.lockUntil <= new Date()) {
+      user.failedLoginAttempts = 0
+      user.lockUntil = undefined
+    }
+
+    // 4. Inactive check — 403 so client knows account is deactivated
     if (user.status === 'inactive') {
       throw new AppError('Account is deactivated — contact your administrator', 403)
     }
 
-    // 4. Constant-time bcrypt compare
-    const isMatch = await bcrypt.compare(password, user.passwordHash)
-    if (!isMatch) {
-      throw new AppError('Invalid email or password', 401)
+    // 5. Email verification check
+    if (user.isEmailVerified === false) {
+      throw new AppError('Email address is not verified. Please check your inbox for the verification link.', 403)
     }
 
+    // 6. Constant-time bcrypt compare
+    const isMatch = await bcrypt.compare(password, user.passwordHash)
+    if (!isMatch) {
+      const attempts = (user.failedLoginAttempts || 0) + 1
+      if (attempts >= 5) {
+        const lockUntil = new Date(Date.now() + 15 * 60 * 1000) // 15 min lock
+        await User.updateOne(
+          { _id: user._id },
+          { $set: { failedLoginAttempts: attempts, lockUntil } }
+        )
+        throw new AppError(
+          `Account is temporarily locked due to 5 consecutive failed login attempts. Please try again in 15 minute(s).`,
+          423
+        )
+      } else {
+        await User.updateOne(
+          { _id: user._id },
+          { $set: { failedLoginAttempts: attempts } }
+        )
+        throw new AppError('Invalid email or password', 401)
+      }
+    }
+
+    // 7. Successful login — reset failed attempts and clear lock
     const userIdStr = (user._id as any).toString()
     const tokenVersion = user.tokenVersion ?? 0
 
-    // 5. Issue token pair
+    // Issue token pair
     const accessToken = signAccessToken(userIdStr, user.orgId.toString(), user.role, tokenVersion)
     const refreshToken = signRefreshToken(userIdStr, tokenVersion)
 
-    // 6. Persist hashed refresh token (rotation: replaces any previous hash).
-    // Use updateOne instead of user.save() to avoid DocumentNotFoundError
-    // if the document is deleted between findOne and save (e.g., in test teardown).
+    // Persist hashed refresh token and reset lockout state
     await User.updateOne(
       { _id: user._id },
-      { $set: { refreshTokenHash: hashToken(refreshToken) } }
+      {
+        $set: { failedLoginAttempts: 0, refreshTokenHash: hashToken(refreshToken) },
+        $unset: { lockUntil: '' },
+      }
     )
 
-    // 7. Set HttpOnly refresh cookie
+    // Set HttpOnly refresh cookie
     setRefreshCookie(res, refreshToken)
 
     res.status(200).json({
       success: true,
       token: accessToken,
+      refreshToken: refreshToken,
       user: sanitizeUser(user),
     })
   } catch (err) {
@@ -256,11 +296,47 @@ export async function login(
   }
 }
 
+// ── POST /api/auth/verify-email ───────────────────────────────────────────
+
+export async function verifyEmail(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const token = String(req.body?.token || req.query?.token || '').trim()
+    if (!token) {
+      throw new AppError('Verification token is required', 400)
+    }
+
+    const hashedToken = hashToken(token)
+    const user = await User.findOne({
+      emailVerificationToken: hashedToken,
+      emailVerificationExpires: { $gt: new Date() },
+    })
+
+    if (!user) {
+      throw new AppError('Invalid or expired email verification token', 400)
+    }
+
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: { isEmailVerified: true },
+        $unset: { emailVerificationToken: '', emailVerificationExpires: '' },
+      }
+    )
+
+    res.status(200).json({
+      success: true,
+      message: 'Email address verified successfully. You can now log in.',
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
 // ── POST /api/auth/refresh ────────────────────────────────────────────────
-//
-// Silently issues a new short-lived access token using the HttpOnly refresh
-// cookie. Does NOT rotate the refresh token itself (rotation adds complexity
-// with multi-tab sessions; tokenVersion provides revocation).
 
 export async function refresh(
   req: Request,
@@ -268,7 +344,11 @@ export async function refresh(
   next: NextFunction
 ): Promise<void> {
   try {
-    const rawRefreshToken = req.cookies?.[REFRESH_COOKIE_NAME]
+    const rawRefreshToken =
+      req.cookies?.[REFRESH_COOKIE_NAME] ||
+      (req.body && req.body.refreshToken) ||
+      (req.headers['x-refresh-token'] as string)
+
     if (!rawRefreshToken) {
       throw new AppError('No refresh token — please log in again', 401)
     }
@@ -319,6 +399,7 @@ export async function refresh(
       token: newAccessToken,
       user: sanitizeUser(user),
     })
+
   } catch (err) {
     next(err)
   }

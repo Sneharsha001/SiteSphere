@@ -61,10 +61,11 @@ async function seedOrg(label: string): Promise<OrgFixture> {
   const orgId = (org._id as any).toString()
 
   const [admin, pm, engineer] = await User.insertMany([
-    { orgId, name: `Admin ${label}`, email: `admin_${label}_${id}@authtest.com`, passwordHash: hash, role: 'admin', status: 'active', tokenVersion: 0 },
-    { orgId, name: `PM ${label}`,    email: `pm_${label}_${id}@authtest.com`,    passwordHash: hash, role: 'pm',    status: 'active', tokenVersion: 0 },
-    { orgId, name: `Eng ${label}`,   email: `eng_${label}_${id}@authtest.com`,   passwordHash: hash, role: 'site_engineer', status: 'active', tokenVersion: 0 },
+    { orgId, name: `Admin ${label}`, email: `admin_${label}_${id}@authtest.com`, passwordHash: hash, role: 'admin', status: 'active', isEmailVerified: true, tokenVersion: 0 },
+    { orgId, name: `PM ${label}`,    email: `pm_${label}_${id}@authtest.com`,    passwordHash: hash, role: 'pm',    status: 'active', isEmailVerified: true, tokenVersion: 0 },
+    { orgId, name: `Eng ${label}`,   email: `eng_${label}_${id}@authtest.com`,   passwordHash: hash, role: 'site_engineer', status: 'active', isEmailVerified: true, tokenVersion: 0 },
   ])
+
 
   const engineerId = (engineer._id as any).toString()
 
@@ -409,7 +410,9 @@ describe('Within-Org Isolation — engineer cannot read another engineer\'s DPR'
       passwordHash: hash,
       role: 'site_engineer',
       status: 'active',
+      isEmailVerified: true,
       tokenVersion: 0,
+
     })
     secondEngineerId = (eng2._id as any).toString()
 
