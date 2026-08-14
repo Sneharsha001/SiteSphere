@@ -77,6 +77,80 @@ Site engineers today log daily progress on paper or in WhatsApp messages. Projec
 
 ---
 
+## 🚦 Staging vs Production Environments
+
+> [!IMPORTANT]
+> **DEVELOPMENT RULE:** Always test changes on staging first, and only merge or deploy to production after verifying functionality on staging. Never push untested commits directly to production.
+
+### Git Branching & Auto-Deployment Workflow
+
+```
+               ┌────────────────────────┐
+               │    Local Development   │
+               └───────────┬────────────┘
+                           │
+                           ▼
+               ┌────────────────────────┐
+               │     `staging` Branch   │
+               └───────────┬────────────┘
+                           │ (Auto-deploys via GitHub push)
+             ┌─────────────┴─────────────┐
+             ▼                           ▼
+┌─────────────────────────┐ ┌───────────────────────────┐
+│ Staging Web Service     │ │ Staging Static Site       │
+│ (sitetrack-staging-backend) │ (sitesphere-staging-app)  │
+└────────────┬────────────┘ └────────────┬──────────────┘
+             │ (Verified)                │
+             └─────────────┬─────────────┘
+                           │ Pull Request / Merge
+                           ▼
+               ┌────────────────────────┐
+               │      `main` Branch     │
+               └───────────┬────────────┘
+                           │ (Auto-deploys to Production)
+             ┌─────────────┴─────────────┐
+             ▼                           ▼
+┌─────────────────────────┐ ┌───────────────────────────┐
+│ Production Web Service  │ │ Production Static Site    │
+│ (sitetrack-backend)     │ │ (sitesphere-app)          │
+└─────────────────────────┘ └───────────────────────────┘
+```
+
+### Environment Isolation Matrix
+
+| Configuration Variable | Staging Environment (`staging` branch) | Production Environment (`main` branch) |
+|---|---|---|
+| **Render Web Service (Backend)** | `sitetrack-backend-staging` | `sitetrack-backend` |
+| **Render Static Site (Frontend)** | `sitesphere-staging` | `sitesphere-app` |
+| **MongoDB Atlas Database** | `mongodb+srv://.../sitetrack_staging` | `mongodb+srv://.../sitetrack_production` |
+| **Frontend API Endpoint (`VITE_API_URL`)** | `https://api-staging.sitesphere.com/api` | `https://api.sitesphere.com/api` |
+| **Allowed CORS Origin (`FRONTEND_URL`)** | `https://app-staging.sitesphere.com` | `https://app.sitesphere.com` |
+| **JWT Access Secret (`JWT_SECRET`)** | Isolated Staging Secret | Isolated Production Secret |
+| **JWT Refresh Secret (`JWT_REFRESH_SECRET`)** | Isolated Staging Refresh Secret | Isolated Production Refresh Secret |
+| **Cloudinary Folder** | `sitetrack_staging/` | `sitetrack_production/` |
+
+### Setting Up Staging on Render
+
+1. **Create Staging Database**:
+   - In MongoDB Atlas, create a database named `sitetrack_staging` on your existing cluster (or a separate staging cluster).
+2. **Create Staging Web Service (Backend)**:
+   - In Render Dashboard, click **New +** → **Web Service** → Connect Repository.
+   - Name: `sitetrack-backend-staging`
+   - Branch: `staging`
+   - Build Command: `npm install && npm run build`
+   - Start Command: `npm start`
+   - Environment Variables: Set `MONGODB_URI` pointing to `sitetrack_staging`, `FRONTEND_URL=https://app-staging.sitesphere.com`, and unique `JWT_SECRET`.
+3. **Create Staging Static Site (Frontend)**:
+   - In Render Dashboard, click **New +** → **Static Site** → Connect Repository.
+   - Name: `sitesphere-staging`
+   - Branch: `staging`
+   - Build Command: `npm install && npm run build`
+   - Publish Directory: `dist`
+   - Environment Variables: Set `VITE_API_URL=https://api-staging.sitesphere.com/api`.
+
+
+---
+
 ## Screenshots
 
 > Drop your images into a `screenshots/` folder at the repo root and update these paths.
