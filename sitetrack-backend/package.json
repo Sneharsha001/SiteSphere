@@ -14,8 +14,11 @@
     "test:email": "tsx src/scripts/testEmailNotification.ts",
     "test:audit": "tsx src/scripts/testAuditAndWindow.ts",
     "test:dpr": "tsx src/scripts/testDprApi.ts",
+    "db:backup": "tsx src/scripts/backupDb.ts",
+    "db:restore": "tsx src/scripts/restoreDb.ts",
     "test": "vitest run"
   },
+
   "keywords": [
     "express",
     "typescript",
