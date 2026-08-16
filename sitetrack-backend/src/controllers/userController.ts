@@ -223,3 +223,86 @@ export async function createAssignment(
     next(err)
   }
 }
+
+// ── PATCH /api/users/:id/approve ──────────────────────────────────────────
+// Admin approves a pending signup, optionally correcting the role first.
+
+export async function approvePendingUser(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const id = String(req.params.id)
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new AppError('Invalid user ID format', 400)
+    }
+
+    const target = await User.findOne({ _id: id, orgId: req.user!.orgId })
+    if (!target) {
+      throw new AppError('User not found in your organization', 404)
+    }
+
+    if (target.status !== 'pending') {
+      throw new AppError('User is not in pending status', 400)
+    }
+
+    const allowedRoles = ['admin', 'pm', 'site_engineer'] as const
+    const { role } = req.body as { role?: typeof allowedRoles[number] }
+
+    if (role && !allowedRoles.includes(role)) {
+      throw new AppError(`Invalid role. Allowed: ${allowedRoles.join(', ')}`, 400)
+    }
+
+    target.status = 'active'
+    if (role) target.role = role
+    // Mark email as verified upon approval so the user can log in immediately
+    target.isEmailVerified = true
+    await target.save()
+
+    res.status(200).json({
+      success: true,
+      data: sanitizeUser(target),
+      message: `Account for ${target.name} has been approved.`,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ── DELETE /api/users/:id/reject ──────────────────────────────────────────
+// Admin rejects and permanently deletes a pending signup.
+
+export async function rejectPendingUser(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const id = String(req.params.id)
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new AppError('Invalid user ID format', 400)
+    }
+
+    const target = await User.findOne({ _id: id, orgId: req.user!.orgId })
+    if (!target) {
+      throw new AppError('User not found in your organization', 404)
+    }
+
+    if (target.status !== 'pending') {
+      throw new AppError('Only pending accounts can be rejected', 400)
+    }
+
+    await target.deleteOne()
+
+    res.status(200).json({
+      success: true,
+      message: `Account request for ${target.name} has been rejected and removed.`,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+

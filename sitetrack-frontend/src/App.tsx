@@ -13,6 +13,7 @@ import SubmitReportPage from './pages/SubmitReportPage'
 import MyReportsPage from './pages/MyReportsPage'
 import ReportDetailPage from './pages/ReportDetailPage'
 import EditReportPage from './pages/EditReportPage'
+import SignupPage from './pages/SignupPage'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/resend-verification" element={<ResendVerificationPage />} />
+        <Route path="/signup" element={<SignupPage />} />
 
         {/* Protected routes — require authentication */}
         <Route

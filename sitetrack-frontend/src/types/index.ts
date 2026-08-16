@@ -8,7 +8,7 @@ export interface AuthUser {
   name: string
   email: string
   role: UserRole
-  status: 'active' | 'inactive'
+  status: 'active' | 'inactive' | 'pending'
   orgId: string
   isEmailVerified: boolean
 }
@@ -35,7 +35,7 @@ export interface AppUser {
   name: string
   email: string
   role: UserRole
-  status: 'active' | 'inactive'
+  status: 'active' | 'inactive' | 'pending'
   orgId: string
   createdAt: string
   updatedAt: string

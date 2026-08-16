@@ -54,14 +54,18 @@ async function seed(): Promise<void> {
       passwordHash,
       role: 'admin',
       status: 'active',
+      isEmailVerified: true,
+      tokenVersion: 0,
     })
     console.log(`✅  Admin user created`)
   } else {
     // Update password hash in case the script is re-run to reset credentials
     existingUser.passwordHash = passwordHash
+    existingUser.isEmailVerified = true
+    existingUser.status = 'active'
     await existingUser.save()
     user = existingUser
-    console.log(`ℹ️   Admin user already exists — password reset to seed value`)
+    console.log(`ℹ️   Admin user already exists — password and verification status reset`)
   }
 
   // ── 3. Print credentials ─────────────────────────────────────────────

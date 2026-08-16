@@ -160,35 +160,31 @@ export async function register(
     const hashedVerificationToken = hashToken(rawVerificationToken)
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h
 
-    // 6. Create the first Admin user for the new org (unverified initially)
+    // 6. Create the new user as 'pending' — must be approved by an admin before login
     const user = await User.create({
       orgId,
       name,
       email,
       passwordHash,
-      role: 'admin',
-      status: 'active',
+      role: 'site_engineer', // default role; admin can correct on approval
+      status: 'pending',
       isEmailVerified: false,
       emailVerificationToken: hashedVerificationToken,
       emailVerificationExpires: verificationExpires,
       tokenVersion: 0,
     })
 
-    const userIdStr = (user._id as any).toString()
-    const tokenVersion = user.tokenVersion ?? 0
-
-    // 7. Issue token pair (access token only; do not issue refresh until email verified)
-    const accessToken = signAccessToken(userIdStr, orgId, user.role, tokenVersion)
-
-    // 8. Send verification email (non‑blocking). We ignore failures to keep registration atomic.
+    // 7. Do NOT issue tokens — pending users cannot log in yet.
+    //    Send a verification email so the token doesn't expire unused,
+    //    but the account still requires admin approval before first login.
     const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${rawVerificationToken}`
     sendVerificationEmail(user.email, user.name, verificationLink).catch(() => {})
 
     res.status(201).json({
       success: true,
-      token: accessToken,
-      user: sanitizeUser(user),
-      message: 'Verification email sent. Please verify your address.',
+      pending: true,
+      message:
+        'Your account request has been submitted. An Admin will review and approve it before you can log in.',
     })
   } catch (err) {
     next(err)
@@ -235,6 +231,14 @@ export async function login(
     // 4. Inactive check — 403 so client knows account is deactivated
     if (user.status === 'inactive') {
       throw new AppError('Account is deactivated — contact your administrator', 403)
+    }
+
+    // 5. Pending approval check — 403 with clear pending message
+    if (user.status === 'pending') {
+      throw new AppError(
+        'Your account is pending admin approval. You will be notified once approved.',
+        403
+      )
     }
 
     // 5. Email verification check

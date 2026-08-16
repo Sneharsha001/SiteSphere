@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import LoginForm from '../components/LoginForm'
 import { useAuth } from '../context/AuthContext'
 
@@ -54,11 +54,15 @@ export default function LoginPage() {
 
           <LoginForm onSuccess={handleSuccess} />
 
-          <p className="text-center text-slate-600 text-xs mt-6">
-            Secure access · JWT authentication
+          <p className="text-center text-slate-500 text-sm mt-6">
+            New to SiteTrack?{' '}
+            <Link to="/signup" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+              Request an account
+            </Link>
           </p>
         </div>
       </div>
     </div>
   )
 }
+

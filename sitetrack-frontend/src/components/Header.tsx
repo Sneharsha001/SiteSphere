@@ -169,15 +169,20 @@ export default function Header() {
           {/* User profile & Logout */}
           {user && (
             <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-              <div className="text-right hidden sm:block">
-                <p className="text-white text-sm font-medium leading-none">{user.name}</p>
-                <p className="text-slate-500 text-xs mt-0.5">{user.email}</p>
+              <div className="text-right flex flex-col items-end">
+                <div className="flex items-center gap-2">
+                  <span id="user-name-label" className="text-white text-sm font-semibold leading-none">{user.name}</span>
+                  {badge && (
+                    <span
+                      id="user-role-badge"
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.cls}`}
+                    >
+                      {badge.label}
+                    </span>
+                  )}
+                </div>
+                <span className="text-slate-400 text-xs mt-1 hidden sm:block">{user.email}</span>
               </div>
-              {badge && (
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${badge.cls}`}>
-                  {badge.label}
-                </span>
-              )}
               <button
                 id="logout-btn"
                 onClick={handleLogout}
@@ -195,6 +200,7 @@ export default function Header() {
               </button>
             </div>
           )}
+
         </nav>
       </div>
 

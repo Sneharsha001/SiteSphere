@@ -187,6 +187,116 @@ function NewUserModal({ onClose, onCreated }: NewUserModalProps) {
   )
 }
 
+// ── Approve Modal ─────────────────────────────────────────────────────────
+
+interface ApproveModalProps {
+  user: AppUser
+  onClose: () => void
+  onApproved: (userId: string, updatedUser: AppUser) => void
+}
+
+function ApproveModal({ user, onClose, onApproved }: ApproveModalProps) {
+  const [role, setRole] = useState<UserRole>(user.role as UserRole || 'site_engineer')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleApprove = async () => {
+    try {
+      setSubmitting(true)
+      setError(null)
+      const res = await api.patch(`/users/${user._id}/approve`, { role })
+      if (res.data?.data) {
+        onApproved(user._id, res.data.data)
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Approval failed.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-white">Approve Account Request</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Confirm role before activating account</p>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 rounded-full hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {error && (
+            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>
+          )}
+
+          {/* User info */}
+          <div className="flex items-center gap-3 p-4 bg-white/5 rounded-xl border border-white/10">
+            <div className="w-10 h-10 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 font-bold text-sm flex-shrink-0">
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-white font-medium text-sm">{user.name}</p>
+              <p className="text-slate-400 text-xs">{user.email}</p>
+            </div>
+          </div>
+
+          {/* Role selector */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+              Assign Role <span className="text-red-400">*</span>
+            </label>
+            <p className="text-xs text-slate-500 mb-2">User registered as Site Engineer by default. Correct if needed.</p>
+            <select
+              id="approve-role-select"
+              value={role}
+              onChange={(e) => setRole(e.target.value as UserRole)}
+              className="w-full bg-slate-800 border border-white/15 rounded-lg px-3.5 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
+            >
+              <option value="admin">Admin</option>
+              <option value="pm">Project Manager</option>
+              <option value="site_engineer">Site Engineer</option>
+            </select>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 text-sm font-medium text-white rounded-xl border border-white/10 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              id="confirm-approve-btn"
+              onClick={handleApprove}
+              disabled={submitting}
+              className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-sm font-semibold text-white rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              {submitting ? (
+                <>
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                  </svg>
+                  Approving…
+                </>
+              ) : (
+                '✓ Approve Account'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── UsersPage ─────────────────────────────────────────────────────────────
 
 export default function UsersPage() {
@@ -196,6 +306,8 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [approveTarget, setApproveTarget] = useState<AppUser | null>(null)
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
 
   const fetchUsers = async () => {
     try {
@@ -232,10 +344,32 @@ export default function UsersPage() {
     }
   }
 
+  const handleApproved = (userId: string, updatedUser: AppUser) => {
+    setUsers((prev) => prev.map((u) => (u._id === userId ? { ...u, ...updatedUser, status: 'active' } : u)))
+    setApproveTarget(null)
+  }
+
+  const handleReject = async (userId: string, userName: string) => {
+    if (!window.confirm(`Reject and permanently delete the account request for "${userName}"?`)) return
+    try {
+      setRejectingId(userId)
+      await api.delete(`/users/${userId}/reject`)
+      setUsers((prev) => prev.filter((u) => u._id !== userId))
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to reject account.')
+    } finally {
+      setRejectingId(null)
+    }
+  }
+
   const handleUserCreated = (user: AppUser) => {
     setUsers((prev) => [user, ...prev])
     setShowModal(false)
   }
+
+  // Split users by status
+  const pendingUsers = users.filter((u) => u.status === 'pending')
+  const activeInactiveUsers = users.filter((u) => u.status !== 'pending')
 
   return (
     <div className="min-h-screen bg-slate-900 text-white">
@@ -247,7 +381,12 @@ export default function UsersPage() {
           <div>
             <h1 className="text-3xl font-bold text-white">Users</h1>
             <p className="text-slate-400 mt-1 text-sm">
-              {loading ? 'Loading…' : `${users.length} user${users.length !== 1 ? 's' : ''} in your organisation`}
+              {loading ? 'Loading…' : `${activeInactiveUsers.length} user${activeInactiveUsers.length !== 1 ? 's' : ''} in your organisation`}
+              {pendingUsers.length > 0 && (
+                <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/25">
+                  {pendingUsers.length} pending
+                </span>
+              )}
             </p>
           </div>
           <button
@@ -278,117 +417,212 @@ export default function UsersPage() {
             </svg>
             <span className="text-slate-400 text-sm">Loading users…</span>
           </div>
-        ) : users.length === 0 ? (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-14 text-center">
-            <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center mx-auto mb-4 border border-indigo-500/20">
-              <svg className="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <h2 className="text-lg font-semibold text-white mb-2">No users yet</h2>
-            <p className="text-slate-400 text-sm max-w-sm mx-auto mb-6">
-              Add team members to your organisation.
-            </p>
-            <button
-              onClick={() => setShowModal(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-colors"
-            >
-              Create First User
-            </button>
-          </div>
         ) : (
-          /* Users table */
-          <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-            {/* Table header */}
-            <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-6 py-3 border-b border-white/10 bg-white/[0.03]">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Name / Email</span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Role</span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Status</span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Actions</span>
-            </div>
-
-            {/* User rows */}
-            {users.map((u) => {
-              const role = roleConfig[u.role] ?? roleConfig.site_engineer
-              const isSelf = u._id === currentUser?.id
-              const isToggling = togglingId === u._id
-
-              return (
-                <div
-                  key={u._id}
-                  className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 items-center px-6 py-4 border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors"
-                >
-                  {/* Name / Email */}
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-white truncate flex items-center gap-2">
-                      {u.name}
-                      {isSelf && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                          You
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-slate-500 truncate mt-0.5">{u.email}</p>
+          <>
+            {/* ── Pending Requests Section ────────────────────────────────── */}
+            {pendingUsers.length > 0 && (
+              <section className="mb-8">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                    <h2 className="text-lg font-semibold text-white">Pending Requests</h2>
                   </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                    {pendingUsers.length}
+                  </span>
+                </div>
+                <p className="text-slate-400 text-sm mb-4">
+                  These accounts were self-registered and are awaiting your approval. You can correct the role before approving.
+                </p>
 
-                  {/* Role */}
-                  <div>
-                    <span className={`inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full border ${role.className}`}>
-                      {role.label}
-                    </span>
-                  </div>
-
-                  {/* Status badge */}
-                  <div>
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                        u.status === 'active'
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                          : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl overflow-hidden">
+                  {pendingUsers.map((u, idx) => (
+                    <div
+                      key={u._id}
+                      id={`pending-user-${u._id}`}
+                      className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 ${
+                        idx < pendingUsers.length - 1 ? 'border-b border-amber-500/10' : ''
                       }`}
                     >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${u.status === 'active' ? 'bg-emerald-400' : 'bg-slate-500'}`}
-                      />
-                      {u.status === 'active' ? 'Active' : 'Inactive'}
-                    </span>
+                      {/* User info */}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-400 font-bold text-sm flex-shrink-0">
+                          {u.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-white truncate">{u.name}</p>
+                          <p className="text-xs text-slate-400 truncate">{u.email}</p>
+                        </div>
+                      </div>
+
+                      {/* Badges */}
+                      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          Pending Approval
+                        </span>
+                        <span className={`inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full border ${roleConfig[u.role as UserRole]?.className ?? roleConfig.site_engineer.className}`}>
+                          {roleConfig[u.role as UserRole]?.label ?? 'Site Engineer'} (requested)
+                        </span>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          id={`approve-btn-${u._id}`}
+                          onClick={() => setApproveTarget(u)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition-colors"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Approve
+                        </button>
+                        <button
+                          id={`reject-btn-${u._id}`}
+                          onClick={() => handleReject(u._id, u.name)}
+                          disabled={rejectingId === u._id}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 hover:text-red-300 text-xs font-semibold rounded-lg border border-red-500/30 transition-colors disabled:opacity-50"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          {rejectingId === u._id ? 'Rejecting…' : 'Reject'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ── Active / Inactive Users Section ─────────────────────────── */}
+            {activeInactiveUsers.length === 0 && pendingUsers.length === 0 ? (
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-14 text-center">
+                <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center mx-auto mb-4 border border-indigo-500/20">
+                  <svg className="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-lg font-semibold text-white mb-2">No users yet</h2>
+                <p className="text-slate-400 text-sm max-w-sm mx-auto mb-6">
+                  Add team members to your organisation.
+                </p>
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-colors"
+                >
+                  Create First User
+                </button>
+              </div>
+            ) : activeInactiveUsers.length > 0 ? (
+              <section>
+                {pendingUsers.length > 0 && (
+                  <h2 className="text-base font-semibold text-slate-300 mb-4">Active Members</h2>
+                )}
+                {/* Users table */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                  {/* Table header */}
+                  <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-6 py-3 border-b border-white/10 bg-white/[0.03]">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Name / Email</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Role</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Status</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Actions</span>
                   </div>
 
-                  {/* Toggle button */}
-                  <div>
-                    <button
-                      id={`toggle-status-${u._id}`}
-                      onClick={() => handleToggleStatus(u._id)}
-                      disabled={isSelf || isToggling}
-                      title={
-                        isSelf
-                          ? 'You cannot deactivate your own account'
-                          : u.status === 'active'
-                          ? 'Deactivate user'
-                          : 'Reactivate user'
-                      }
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 focus:ring-offset-slate-900 ${
-                        isSelf || isToggling ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
-                      } ${u.status === 'active' ? 'bg-emerald-500' : 'bg-slate-600'}`}
-                      role="switch"
-                      aria-checked={u.status === 'active'}
-                    >
-                      <span
-                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${
-                          u.status === 'active' ? 'translate-x-4' : 'translate-x-0.5'
-                        }`}
-                      />
-                    </button>
-                  </div>
+                  {/* User rows */}
+                  {activeInactiveUsers.map((u) => {
+                    const role = roleConfig[u.role] ?? roleConfig.site_engineer
+                    const isSelf = u._id === currentUser?.id
+                    const isToggling = togglingId === u._id
+
+                    return (
+                      <div
+                        key={u._id}
+                        className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 items-center px-6 py-4 border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors"
+                      >
+                        {/* Name / Email */}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-white truncate flex items-center gap-2">
+                            {u.name}
+                            {isSelf && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                                You
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-slate-500 truncate mt-0.5">{u.email}</p>
+                        </div>
+
+                        {/* Role */}
+                        <div>
+                          <span className={`inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full border ${role.className}`}>
+                            {role.label}
+                          </span>
+                        </div>
+
+                        {/* Status badge */}
+                        <div>
+                          <span
+                            className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                              u.status === 'active'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${u.status === 'active' ? 'bg-emerald-400' : 'bg-slate-500'}`}
+                            />
+                            {u.status === 'active' ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+
+                        {/* Toggle button */}
+                        <div>
+                          <button
+                            id={`toggle-status-${u._id}`}
+                            onClick={() => handleToggleStatus(u._id)}
+                            disabled={isSelf || isToggling}
+                            title={
+                              isSelf
+                                ? 'You cannot deactivate your own account'
+                                : u.status === 'active'
+                                ? 'Deactivate user'
+                                : 'Reactivate user'
+                            }
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 focus:ring-offset-slate-900 ${
+                              isSelf || isToggling ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+                            } ${u.status === 'active' ? 'bg-emerald-500' : 'bg-slate-600'}`}
+                            role="switch"
+                            aria-checked={u.status === 'active'}
+                          >
+                            <span
+                              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${
+                                u.status === 'active' ? 'translate-x-4' : 'translate-x-0.5'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
-          </div>
+              </section>
+            ) : null}
+          </>
         )}
       </main>
 
       {showModal && (
         <NewUserModal onClose={() => setShowModal(false)} onCreated={handleUserCreated} />
+      )}
+
+      {approveTarget && (
+        <ApproveModal
+          user={approveTarget}
+          onClose={() => setApproveTarget(null)}
+          onApproved={handleApproved}
+        />
       )}
     </div>
   )
