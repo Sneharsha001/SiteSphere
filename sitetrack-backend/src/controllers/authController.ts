@@ -4,13 +4,14 @@
  * Production-grade authentication controller.
  *
  * Endpoints:
- *   POST   /api/auth/register        — Public self-registration (creates org + admin user)
  *   POST   /api/auth/login           — Issue access + refresh tokens
- *   POST   /api/auth/refresh         — Rotate access token using HttpOnly cookie
- *   POST   /api/auth/logout          — Revoke refresh token, clear cookie
- *   GET    /api/auth/me              — Fetch authenticated user profile (safe fields only)
- *   POST   /api/auth/forgot-password — Send password reset email
- *   POST   /api/auth/reset-password  — Apply new password, invalidate all sessions
+ *   POST   /api/auth/refresh          — Rotate access token using HttpOnly cookie
+ *   POST   /api/auth/logout           — Revoke refresh token, clear cookie
+ *   GET    /api/auth/me               — Fetch authenticated user profile (safe fields only)
+ *   POST   /api/auth/forgot-password  — Send password reset email
+ *   POST   /api/auth/reset-password   — Apply new password, invalidate all sessions
+ *
+ * Account creation is invite-only via POST /api/users (Admin-only).
  *
  * Security guarantees:
  *   - All inputs validated with Zod before any DB access
@@ -29,11 +30,9 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 
 import { User } from '../models/User'
-import { Organization } from '../models/Organization'
 import { AppError } from '../middleware/errorHandler'
-import { sendPasswordResetEmail, sendVerificationEmail } from '../utils/email'
+import { sendPasswordResetEmail } from '../utils/email'
 import {
-  RegisterSchema,
   LoginSchema,
   ForgotPasswordSchema,
   ResetPasswordSchema,
@@ -120,78 +119,7 @@ function sanitizeUser(user: InstanceType<typeof User>): object {
   }
 }
 
-// ── POST /api/auth/register ───────────────────────────────────────────────
-//
-// Public self-registration. Creates an Organization and its first Admin user.
-// Responds with the same token pair as login so the client is immediately
-// authenticated without a second round-trip.
-
-export async function register(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  try {
-    // 1. Validate with Zod — throws ZodError on bad input
-    const parsed = RegisterSchema.safeParse(req.body)
-    if (!parsed.success) {
-      const messages = parsed.error.issues.map((e) => e.message).join('; ')
-      throw new AppError(messages, 400)
-    }
-    const { organizationName, name, email, password } = parsed.data
-
-    // 2. Check duplicate email (email is already normalised by Zod .toLowerCase())
-    const existing = await User.findOne({ email })
-    if (existing) {
-      // 409 Conflict — specific enough to let the UI say "email already in use"
-      // without revealing whether a full profile exists.
-      throw new AppError('An account with this email already exists', 409)
-    }
-
-    // 3. Create organization
-    const org = await Organization.create({ name: organizationName })
-    const orgId = (org._id as any).toString()
-
-    // 4. Hash password
-    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
-
-    // 5. Generate email verification token
-    const rawVerificationToken = crypto.randomBytes(32).toString('hex')
-    const hashedVerificationToken = hashToken(rawVerificationToken)
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h
-
-    // 6. Create the new user as 'pending' — must be approved by an admin before login
-    const user = await User.create({
-      orgId,
-      name,
-      email,
-      passwordHash,
-      role: 'site_engineer', // default role; admin can correct on approval
-      status: 'pending',
-      isEmailVerified: false,
-      emailVerificationToken: hashedVerificationToken,
-      emailVerificationExpires: verificationExpires,
-      tokenVersion: 0,
-    })
-
-    // 7. Do NOT issue tokens — pending users cannot log in yet.
-    //    Send a verification email so the token doesn't expire unused,
-    //    but the account still requires admin approval before first login.
-    const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${rawVerificationToken}`
-    sendVerificationEmail(user.email, user.name, verificationLink).catch(() => {})
-
-    res.status(201).json({
-      success: true,
-      pending: true,
-      message:
-        'Your account request has been submitted. An Admin will review and approve it before you can log in.',
-    })
-  } catch (err) {
-    next(err)
-  }
-}
-
-// ── POST /api/auth/login ──────────────────────────────────────────────────
+// ── POST /api/auth/login ────────────────────────────────────────────────────
 
 export async function login(
   req: Request,
@@ -233,10 +161,11 @@ export async function login(
       throw new AppError('Account is deactivated — contact your administrator', 403)
     }
 
-    // 5. Pending approval check — 403 with clear pending message
+    // 5. Pending status check — 403 with clear contact-admin message
+    //    (Pending status can be set by Admin; account not yet activated.)
     if (user.status === 'pending') {
       throw new AppError(
-        'Your account is pending admin approval. You will be notified once approved.',
+        'Your account is not yet active — contact your Administrator to activate it.',
         403
       )
     }

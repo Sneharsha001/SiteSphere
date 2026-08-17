@@ -4,7 +4,7 @@
  * Route definitions for all /api/auth/* endpoints.
  *
  * Rate limiting strategy:
- *   authLimiter  — 10 req / 15 min / IP (login, register, forgot-password, reset-password)
+ *   authLimiter    — 10 req / 15 min / IP (login, forgot-password, reset-password)
  *   refreshLimiter — 30 req / 5 min / IP (refresh — called silently by the client)
  *
  * /logout and /me are intentionally not rate-limited:
@@ -16,7 +16,6 @@ import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
 
 import {
-  register,
   login,
   verifyEmail,
   refresh,
@@ -29,7 +28,7 @@ import { authenticateToken } from '../middleware/auth'
 
 const router = Router()
 
-// ── Strict rate limiter: login / register / password-reset ────────────────
+// ── Strict rate limiter: login / password-reset ──────────────────────────
 const isTest = process.env['NODE_ENV'] === 'test'
 
 const authLimiter = rateLimit({
@@ -58,10 +57,7 @@ const refreshLimiter = rateLimit({
 })
 
 
-// ── Public endpoints ──────────────────────────────────────────────────────
-
-// POST /api/auth/register — public self-registration (creates org + admin user)
-router.post('/register', authLimiter, register)
+// ── Public endpoints ─────────────────────────────────────────────────────
 
 // POST /api/auth/verify-email — verify user email address
 router.post('/verify-email', authLimiter, verifyEmail)
