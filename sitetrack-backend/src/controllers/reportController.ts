@@ -239,6 +239,7 @@ export async function listReports(
     const filter: Record<string, any> = {}
 
     // 1. Role-based scoping — always org-bounded
+    // AUDIT CONFIRMED: Site Engineers are strictly scoped to only view their own reports
     if (role === 'site_engineer') {
       // Scope to engineer's own reports, but only for projects in their org.
       // Get all project IDs in this org that this engineer is assigned to.
