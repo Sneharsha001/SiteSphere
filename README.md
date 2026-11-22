@@ -1,5 +1,4 @@
 # SiteSphere
-000000000
 **Real-time daily progress reporting for building construction sites.**  
 Built for site engineers who report from the field and project managers who need visibility without walking the site.
 ## The Problem
