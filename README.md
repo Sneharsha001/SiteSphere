@@ -2,7 +2,7 @@
 **Real-time daily progress reporting for building construction sites.**  
 Built for site engineers who report from the field and project managers who need visibility without walking the site.
 ## The Problem
-]]]]]]]]]]]]]]]]
+]]]]
 Site engineers today log daily progress on paper or in WhatsApp messages. Project managers only get a clear picture during periodic site visits — days or weeks after the fact. Issues go unnoticed, photo evidence gets lost, and there's no audit trail.
 
 **SiteSphere replaces this with a structured, role-based web portal** where engineers submit Daily Progress Reports (DPRs) with photos from any device, and PMs get a live dashboard feed the moment a report lands.
