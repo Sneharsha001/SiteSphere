@@ -44,7 +44,7 @@ xjnzzjknzkxzxkz
 | **File Storage** | Cloudinary (photo uploads) |
 | **Deployment** | Render (frontend static site + backend web service) |
 
----
+-----------------------------
 
 ## Architecture
 
