@@ -62,7 +62,7 @@ Site engineers today log daily progress on paper or in WhatsApp messages. Projec
   │  MongoDB Atlas  │    │      Cloudinary       │
   │  (Mongoose ODM) │    │  (photo storage CDN)  │
   └─────────────────┘    └──────────────────────┘
-```
+```knjfkolp;=[]][plmkbjnkoqp  []=]=[p-i9u879y6te4szavbnjmk,l;./'
 
 **Data flow for a DPR submission:**
 1. Engineer fills form → React Hook Form + Zod validates client-side
