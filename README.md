@@ -17,7 +17,7 @@ Site engineers today log daily progress on paper or in WhatsApp messages. Projec
 - Edit your own report within a **24-hour window** after submission
 - View your personal report history with status indicators
 - Offline-capable form (IndexedDB-backed draft persistence)
-
+bhdguacihucjcd
 ### 📊 Project Manager
 - Live **dashboard feed** showing DPRs across all assigned projects
 - Filter by project, date range, or engineer
