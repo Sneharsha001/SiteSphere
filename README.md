@@ -33,7 +33,7 @@ xjnzzjknzkxzxkz
 - **Override edits** on any DPR at any time (bypasses the 24-hour lock)
 - Full **audit log** — every edit, who made it, when, and what changed
 
-------------------------
+---------------------------------------
 
 ## Tech Stack
 
